@@ -1,0 +1,17 @@
+[Unit]
+Description=Run the certificate watchdog daily
+Documentation=file:/usr/local/sbin/cert-watchdog
+
+[Timer]
+# Once a day, off-peak, with a random delay so many boxes do not all wake at
+# the same instant. Daily is the point: Caddy gives ~30 days of margin before
+# it even tries to renew, so catching a broken dependency the same day is what
+# turns a silent month-long failure into a visible alarm.
+OnCalendar=*-*-* 04:17:00
+RandomizedDelaySec=30m
+# Catch up after downtime, and run at boot: a box that was off when the timer
+# was due would otherwise skip the check entirely.
+Persistent=true
+
+[Install]
+WantedBy=timers.target

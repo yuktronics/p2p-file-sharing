@@ -1,0 +1,85 @@
+# Caddy: TLS terminator for the signal server.
+#
+# Caddy does NOT own public TCP :443 — sslh does, because TURN-over-TLS and
+# HTTPS both need :443 and only one process can hold a TCP port. sslh reads the
+# SNI and forwards everything that is not the TURN hostname here.
+#
+# THE :80 LISTENER IS LOAD-BEARING. Do not remove it.
+#   sslh has public TCP :443, so Caddy cannot, and :80 is then the only port
+#   left where ACME HTTP-01 can be solved. TLS-ALPN-01 is doubly dead: it needs
+#   TCP :443 (which sslh holds) and the :8080 backend does not offer the
+#   acme-tls/1 ALPN. Caddy does not even attempt renewal until ~day 60 of a
+#   90-day certificate, so a removed :80 listener stays silent for a month and
+#   then both certificates lapse and the product goes offline.
+#   cert-watchdog.timer checks this daily and alarms the same day.
+#   See docs/deploy/cert-watchdog and docs/DEPLOY-VPS.md §Step 8 (TLS in front).
+#
+# Port layout:
+#   TCP :80    Caddy  — ACME HTTP-01 + the http->https redirect
+#   TCP :443   sslh   — SNI router (see sslh.conf)
+#   TCP :8080  Caddy  — the HTTPS backend sslh forwards ordinary traffic to
+#   UDP :443   Caddy  — HTTP/3 (QUIC); a different port space from TCP, so it
+#                       coexists with sslh. Never bind sslh on UDP.
+#   UDP :3478  coturn — TURN + STUN
+#
+# Substitute your own hostnames for the two site blocks below.
+
+{
+	servers :8080 {
+		protocols h1 h2
+	}
+	# HTTP/3 only. With no site of its own Caddy discards this server, so the
+	# :443 site address below is what keeps it alive.
+	servers :443 {
+		protocols h3
+	}
+	servers {
+		# Nothing here should ever be logged to disk: a request log would record
+		# every room id, and a room id is a share-link secret. See docs/SECURITY.md.
+		trusted_proxies static 127.0.0.1
+		client_ip_headers X-Forwarded-For X-Real-IP
+	}
+}
+
+# The API. Listed on both :8080 and :443 so the h3-only server above has a site.
+api.example.com:8080, api.example.com:443 {
+	encode zstd gzip
+
+	# Caddy derives Alt-Svc from the port it is serving on. The h1/h2 server is
+	# on :8080, so it would advertise h3=":8080" where nothing listens and HTTP/3
+	# would never be attempted by any browser. Name the real QUIC port.
+	header Alt-Svc "h3=\":443\"; ma=2592000"
+
+	header {
+		# Belt-and-braces. The Go server sets these on every response itself; this
+		# is so that no future route can ever be served without them.
+		X-Content-Type-Options nosniff
+		X-Frame-Options DENY
+		Referrer-Policy no-referrer
+		-Server
+	}
+
+	reverse_proxy 127.0.0.1:8090 {
+		header_up X-Real-IP {remote_host}
+	}
+	log {
+		output discard
+	}
+}
+
+# The TURN hostname. sslh routes that SNI to coturn, so this block never serves
+# real traffic — it exists only to hold a certificate for the name the app
+# advertises in `turns:`. Without it there is no cert for that host and
+# TURN-over-TLS fails host-name validation.
+turn.example.com:8080 {
+	respond 204
+}
+
+# THE ACME LISTENER. See the warning at the top of this file.
+http://api.example.com {
+	redir https://api.example.com 308
+}
+
+http://turn.example.com {
+	respond 204
+}

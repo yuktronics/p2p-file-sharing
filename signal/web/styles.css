@@ -1,0 +1,476 @@
+/* p2p file sharing design system v3 — "direct beam" identity.
+   Dark-first glass + aurora depth, stepped flow, terminal log.
+   Themes via [data-theme]. Zero build, zero external assets. */
+*,*::before,*::after{box-sizing:border-box}
+[hidden]{display:none!important}
+:root{
+  --font:"Inter",system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  --mono:ui-monospace,"JetBrains Mono","SF Mono",SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace;
+  --rounded-box:20px; --rounded-btn:14px;
+  --shadow:0 24px 70px rgba(0,0,0,.5);
+  --shadow-sm:0 10px 30px rgba(0,0,0,.35);
+  --ease:cubic-bezier(.2,.9,.25,1);
+}
+/* --- themes ---
+   Two themes, named for what they are rather than for a vibe. The internal keys
+   used to be "sweet" and "lemonade" (plus a removed "midnight"); they are now
+   "dark" and "light" so the selector, the <option> label and the saved
+   preference all read the same. app.js migrates stored values on first load, so
+   upgrading users keep their choice (midnight → dark, its closest survivor). */
+[data-theme="dark"]{color-scheme:dark;
+  --p:#ff5a1f; --pc:#1a1a1f; --s:#ffb25e; --sc:#1a1a1f; --a:#3ddc97; --ac:#04180f;
+  --n:#101014; --nc:#f4f1e8; --b1:#131316; --b2:#1a1a1f; --b3:#242429; --bc:#f4f1e8;
+  --mut:#a8a49a; --dim:#6f6c64; --line:rgba(244,241,232,.1); --line2:rgba(244,241,232,.17);
+  --card:rgba(244,241,232,.03); --card2:rgba(244,241,232,.06);
+  --su:#3ddc97; --wa:#ffb224; --er:#ff6b6b; --in:#7aa5ff;
+  --glow:0 10px 34px rgba(255,90,31,.32);
+  --beam:linear-gradient(100deg,#ff5a1f,#ffb25e);
+}
+[data-theme="light"]{color-scheme:light;
+  --p:#e14e12; --pc:#1a1a1f; --s:#b45309; --sc:#fff; --a:#15803d; --ac:#fff;
+  --n:#1a1a1f; --nc:#f4f1e8; --b1:#efe9da; --b2:#f7f2e6; --b3:#e4dcc8; --bc:#1c1a16;
+  --mut:#6e675c; --dim:#a09a8a; --line:rgba(28,26,22,.13); --line2:rgba(28,26,22,.24);
+  --card:#f7f2e6; --card2:#fffdf6;
+  --su:#15803d; --wa:#b45309; --er:#dc2626; --in:#1d4ed8;
+  --glow:0 12px 30px rgba(225,78,18,.22);
+  --beam:linear-gradient(100deg,#e14e12,#f59e0b);
+}
+html{scroll-behavior:smooth}
+/* Anchored sections must clear the sticky nav (66px tall). Without this the
+   browser scrolls the target flush to the very top of the viewport, so the
+   sticky bar covers the section heading and the page appears to overshoot the
+   section — most obvious on the Privacy link, which landed with its title
+   hidden behind the nav. */
+#features,#how,#faq,#receiveEntry{scroll-margin-top:82px}
+body{margin:0;font-family:var(--font);background:var(--b1);color:var(--bc);min-height:100vh;
+  -webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;overflow-x:hidden}
+a{color:inherit}
+.wrap{max-width:1120px;margin:0 auto;padding:0 20px;position:relative;z-index:2}
+:focus-visible{outline:2px solid var(--s);outline-offset:3px;border-radius:8px}
+::selection{background:color-mix(in srgb,var(--p) 55%,transparent)}
+
+/* --- ambient depth: orbs + grid + noise (fixed, pointer-transparent) ---
+   Each orb is a SMALL blurred box scaled up to its final size, not a 640px box
+   with blur(90px). A CSS filter is rasterised over the element's own pixel area,
+   so blur cost scales with width x height; scaling a pre-blurred small box is
+   visually identical (a soft radial glow) but blurs ~1/16th of the pixels.
+   Measured on the sender page: first paint 260ms -> 192ms, same look.
+
+   Two things must stay in sync or the orbs visibly resize:
+   1) The scale lives in the drift @keyframes (NOT only on the element), because
+      an animated `transform` in @keyframes replaces the element's base transform
+      entirely. If scale(4) were only on .o1, every animation frame would render
+      the orb at 160px instead of 640px.
+   2) Because the outer scale(4) also scales the translate, the per-keyframe
+      translate is divided by 4 so the on-screen drift distance matches the
+      original 640px-box version exactly.
+   Do not "simplify" this back to a large box + large blur: that is invisible in
+   a screenshot diff but costs ~70ms of first paint on every visit. */
+.bg{position:fixed;inset:0;z-index:0;pointer-events:none;overflow:hidden}
+.bg .orb{position:absolute;border-radius:50%;filter:blur(22px);opacity:.5;will-change:transform}
+.bg .o1{width:160px;height:160px;left:-180px;top:-220px;transform-origin:0 0;background:radial-gradient(circle,color-mix(in srgb,var(--p) 55%,transparent),transparent 88%);animation:drift1 26s ease-in-out infinite}
+.bg .o2{width:140px;height:140px;right:-160px;top:6%;transform-origin:100% 0;background:radial-gradient(circle,color-mix(in srgb,var(--s) 42%,transparent),transparent 88%);animation:drift2 32s ease-in-out infinite}
+.bg .o3{width:175px;height:125px;left:30%;bottom:-280px;transform-origin:0 100%;background:radial-gradient(circle,color-mix(in srgb,var(--p) 22%,transparent),transparent 88%);animation:drift1 38s ease-in-out infinite reverse}
+@keyframes drift1{0%,100%{transform:scale(4) translate(0,0) scale(1)}50%{transform:scale(4) translate(15px,10px) scale(1.08)}}
+@keyframes drift2{0%,100%{transform:scale(4) translate(0,0) scale(1)}50%{transform:scale(4) translate(-17px,12px) scale(1.06)}}
+.bg .grid{position:absolute;inset:0;
+  background-image:linear-gradient(color-mix(in srgb,var(--bc) 5%,transparent) 1px,transparent 1px),linear-gradient(90deg,color-mix(in srgb,var(--bc) 5%,transparent) 1px,transparent 1px);
+  background-size:44px 44px;
+  mask-image:radial-gradient(ellipse 90% 60% at 50% 0%,#000 30%,transparent 75%)}
+.bg .noise{position:absolute;inset:0;opacity:.05;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)' opacity='.6'/%3E%3C/svg%3E")}
+[data-theme="light"] .bg .orb{opacity:.28}
+[data-theme="light"] .bg .grid{mask-image:radial-gradient(ellipse 90% 60% at 50% 0%,#000 20%,transparent 70%)}
+
+/* --- navbar --- */
+nav.top{position:sticky;top:0;z-index:30;backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);
+  background:color-mix(in srgb,var(--b1) 72%,transparent);border-bottom:1px solid var(--line);
+  /* Edge-to-edge (Android 15+ WebView): keep the bar below the status area */
+  padding-top:env(safe-area-inset-top,0px)}
+.nav-inner{display:flex;align-items:center;justify-content:space-between;height:66px;gap:12px;flex-wrap:nowrap}
+.brand{display:flex;align-items:center;gap:11px;font-weight:800;font-size:19px;letter-spacing:-.02em;text-decoration:none;
+  flex:none;white-space:nowrap} /* nowrap + flex:none: the row can never squeeze the wordmark
+   into two lines — a wrapped brand grew the bar 35px→52px and cost 0.023 CLS */
+.brand .word{letter-spacing:-.03em}
+.brand .word em{font-style:normal;color:#ff5a1f}
+.logo{width:36px;height:36px;border-radius:12px;display:grid;place-items:center;flex:none;
+  background:#1a1a1f;border:1px solid var(--line2);
+  box-shadow:var(--shadow-sm);position:relative;overflow:hidden}
+.logo svg{width:26px;height:26px;display:block}
+.gh{width:17px;height:17px;vertical-align:-3px}
+.logo::after{content:"";position:absolute;inset:0;background:linear-gradient(115deg,transparent 30%,rgba(255,255,255,.5) 48%,transparent 62%);background-size:220% 100%;animation:logo-shine 5s ease-in-out infinite}
+@keyframes logo-shine{0%,70%{background-position:130% 0}100%{background-position:-130% 0}}
+.brand small{font-weight:750;color:var(--mut);font-size:10.5px;border:1px solid var(--line2);padding:4px 10px;border-radius:99px;letter-spacing:.1em;text-transform:uppercase}
+.nav-links{display:flex;gap:8px;align-items:center;font-size:14px;color:var(--mut);flex:none}
+.nav-links a{text-decoration:none;padding:8px 12px;border-radius:10px;font-weight:650;white-space:nowrap;flex:none}
+.nav-links a:hover{color:var(--bc);background:var(--card2)}
+.nav-ctl{display:flex;gap:8px;align-items:center}
+select.theme-sel{background:var(--b2);border:1px solid var(--line2);color:var(--bc);border-radius:10px;padding:8px 6px;font-size:12.5px;cursor:pointer;font-weight:650;
+  /* A FIXED width, not min-width. A <select> otherwise tracks the rendered width of its
+     longest option, so a late font resolve can reflow the whole nav bar — that cost a real
+     0.023 CLS before. Fixed width also makes the centred label possible, which needs a known
+     box to centre inside. It was 124px when the options were Ember/Midnight/Paper; with only
+     Dark and Light the longest label is ~5 characters, so 68px fits it with room to spare. */
+  width:68px;appearance:none;
+  text-align:center;
+  /* Chromium honours text-align on a closed select; WebKit/Safari does not without this. The
+     native shell is Chromium, but the web build has to work in Safari too. */
+  text-align-last:center;
+  -webkit-text-align-last:center}
+.icon-btn{background:var(--card2);border:1px solid var(--line2);color:var(--bc);border-radius:11px;padding:8px 12px;cursor:pointer;font-size:15px;line-height:1;transition:transform .15s var(--ease),background .15s}
+.icon-btn:hover{transform:translateY(-1px);background:color-mix(in srgb,var(--p) 16%,var(--card2))}
+.icon-btn[aria-pressed="false"]{opacity:.55}
+/* .net-pill (the nav's backend-host indicator) was removed with the pill itself.
+   Its rules are gone rather than left behind: the element no longer exists, so
+   they were dead weight in an already-inlined stylesheet. Removing them also
+   drops the 150px nav box it reserved, which slightly shortens the nav bar. */
+
+/* --- hero --- */
+.hero{text-align:center;padding:54px 0 8px;position:relative}
+.hero-compact{padding:24px 0 4px}
+.hero-compact h1{font-size:clamp(28px,4.2vw,46px);margin:0 0 14px}
+.hero.eyebrow{margin-bottom:2px}
+.eyebrow{display:inline-flex;align-items:center;gap:8px;font-size:12px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:var(--mut);
+  border:1px solid var(--line2);background:var(--card);padding:7px 14px;border-radius:99px}
+.eyebrow .dot{width:7px;height:7px;border-radius:99px;background:var(--a);box-shadow:0 0 12px var(--a);animation:pulse 2s infinite}
+.hero h1{font-size:clamp(36px,5.6vw,64px);line-height:1.02;margin:18px 0 14px;letter-spacing:-.04em;font-weight:850}
+.grad{background:var(--beam);-webkit-background-clip:text;background-clip:text;color:transparent}
+.hero p.sub{color:var(--mut);font-size:clamp(15px,2vw,18px);max-width:680px;margin:0 auto 20px;line-height:1.6}
+.hero p.sub b{color:var(--bc)}
+.rot{display:inline-grid;overflow:hidden;vertical-align:bottom;height:1.35em;font-weight:750;color:var(--bc)}
+.rot span{animation:rot 10s infinite}
+.rot i{display:block;height:1.35em;font-style:normal}
+@keyframes rot{0%,19%{transform:translateY(0)}24%,44%{transform:translateY(-1.35em)}49%,69%{transform:translateY(-2.7em)}74%,94%{transform:translateY(-4.05em)}100%{transform:translateY(-5.4em)}}
+.trust{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin-bottom:22px}
+.badge{display:inline-flex;align-items:center;gap:7px;font-size:12.5px;font-weight:700;border:1px solid var(--line2);
+  background:var(--card);padding:8px 13px;border-radius:99px;color:var(--mut);backdrop-filter:blur(8px)}
+.badge b{color:var(--bc)}
+.badge .bi{font-size:13px}
+.badge-success{color:var(--su);border-color:color-mix(in srgb,var(--su) 45%,transparent)}
+.badge-info{color:var(--in);border-color:color-mix(in srgb,var(--in) 45%,transparent)}
+.dot{width:8px;height:8px;border-radius:99px;background:var(--su);display:inline-block;flex:none}
+.dot.pulse{animation:pulse 1.6s infinite}
+@keyframes pulse{0%,100%{box-shadow:0 0 0 0 color-mix(in srgb,var(--su) 55%,transparent)}55%{box-shadow:0 0 0 7px transparent}}
+
+/* --- stepped flow --- */
+.flow{display:flex;flex-direction:column;gap:16px;margin:14px 0 26px}
+.step-head{display:flex;align-items:center;gap:12px;margin-bottom:14px}
+.step-n{font-family:var(--mono);font-size:12px;font-weight:700;color:var(--pc);background:var(--beam);
+  width:30px;height:30px;border-radius:10px;display:grid;place-items:center;flex:none;box-shadow:var(--glow)}
+.step-head h2{margin:0;font-size:17px;letter-spacing:-.01em}
+.step-head .hint{margin-left:auto;text-align:right}
+.aura{position:relative}
+.aura::before{content:"";position:absolute;inset:-1px;border-radius:inherit;padding:1.5px;pointer-events:none;
+  background:linear-gradient(135deg,var(--p),var(--s),var(--a));
+  -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude;opacity:.6}
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--rounded-box);box-shadow:var(--shadow);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);position:relative}
+.card::before{content:"";position:absolute;inset:0 0 auto 0;height:1px;border-radius:inherit;
+  background:linear-gradient(90deg,transparent,rgba(255,255,255,.22),transparent);pointer-events:none}
+[data-theme="light"] .card::before{background:linear-gradient(90deg,transparent,rgba(255,255,255,.9),transparent)}
+.pad{padding:22px}
+.btn{appearance:none;border:0;cursor:pointer;font-weight:750;border-radius:var(--rounded-btn);padding:13px 22px;font-size:15px;
+  color:var(--pc);background:linear-gradient(135deg,var(--p),color-mix(in srgb,var(--p) 55%,var(--s)));box-shadow:var(--glow);
+  transition:transform .15s var(--ease),filter .15s,box-shadow .2s;position:relative;overflow:hidden;min-height:44px}
+.btn::after{content:"";position:absolute;inset:0;background:linear-gradient(115deg,transparent 30%,rgba(255,255,255,.35) 50%,transparent 62%);background-size:220% 100%;background-position:130% 0;transition:background-position .6s var(--ease)}
+.btn:hover{transform:translateY(-1px);filter:brightness(1.08)}
+.btn:hover::after{background-position:-130% 0}
+.btn:active{transform:translateY(0) scale(.98)}
+.btn:disabled{opacity:.5;cursor:default;transform:none}
+.btn-ghost{background:var(--card2);color:var(--bc);border:1px solid var(--line2);box-shadow:none}
+.btn-ghost::after{display:none}
+.btn-outline{background:transparent;color:var(--bc);border:1.5px solid var(--p);box-shadow:none}
+.btn-outline::after{display:none}
+.btn-sm{padding:9px 14px;font-size:13.5px;border-radius:11px;min-height:38px}
+.btn-lg{padding:15px 30px;font-size:16.5px}
+.btn .kbd-hint{opacity:.7;font-weight:600;font-size:.8em;margin-left:6px}
+
+/* --- dropzone --- */
+#drop,#codeZone{border:1.5px dashed color-mix(in srgb,var(--p) 55%,var(--line2));border-radius:16px;padding:38px 22px;text-align:center;
+  cursor:pointer;transition:border-color .2s,background .2s,transform .2s var(--ease),box-shadow .2s;
+  background:color-mix(in srgb,var(--p) 5%,transparent);position:relative;overflow:hidden;transform-style:preserve-3d;will-change:transform}
+#drop::before,#codeZone::before{content:"";position:absolute;inset:0;pointer-events:none;opacity:0;transition:opacity .25s;
+  background:radial-gradient(420px 200px at 50% 0%,color-mix(in srgb,var(--p) 22%,transparent),transparent 70%)}
+#drop:hover::before{opacity:1}
+#drop:hover,#drop.over{border-color:var(--p);background:color-mix(in srgb,var(--p) 10%,transparent)}
+#drop.over{box-shadow:0 0 0 4px color-mix(in srgb,var(--p) 25%,transparent);transform:scale(1.006)}
+#drop.over::before{opacity:1}
+#drop.dragging{border-color:var(--s);box-shadow:0 0 0 5px color-mix(in srgb,var(--s) 22%,transparent),var(--glow)}
+.drop-icon{width:64px;height:64px;margin:0 auto;border-radius:20px;display:grid;place-items:center;font-size:30px;
+  background:linear-gradient(140deg,color-mix(in srgb,var(--p) 30%,var(--b2)),var(--b2));
+  border:1px solid var(--line2);box-shadow:var(--shadow-sm),inset 0 1px 0 rgba(255,255,255,.12);
+  animation:float 4.6s ease-in-out infinite;transform:translateZ(30px)}
+#drop h3,#codeZone h3{margin:12px 0 5px;font-size:18px;letter-spacing:-.01em}
+#drop p,#codeZone p{margin:0;color:var(--mut);font-size:13.5px;line-height:1.65}
+#codeZone .otp{margin:10px 0 8px}
+#codeZone .hint{margin-top:8px}
+/* No icon above the receive line (unlike #drop), so the shared h3 top margin
+   reads as extra air — trim it. */
+#codeZone h3{margin-top:6px}
+#drop.compact{padding:12px 15px;display:flex;align-items:center;gap:11px;text-align:left;
+  border-style:solid;border-color:var(--line);
+  background:color-mix(in srgb,var(--b2) 55%,transparent)}
+#drop.compact .drop-icon{width:36px;height:36px;font-size:17px;border-radius:12px;animation:none;margin:0}
+#drop.compact h3{font-size:13.5px;font-weight:700;margin:0;color:var(--mut)}
+#drop.compact p{display:none}
+#drop.compact:hover,#drop.compact.over{border-color:var(--p)}
+.drop-formats{display:flex;gap:6px;justify-content:center;margin-top:12px;flex-wrap:wrap}
+.drop-formats span{font-family:var(--mono);font-size:10.5px;font-weight:700;color:var(--dim);border:1px solid var(--line);padding:3px 9px;border-radius:7px;letter-spacing:.04em}
+#drop.compact .drop-formats{display:none}
+kbd.kbd{font-family:var(--mono);font-size:11px;border:1px solid var(--line2);border-bottom-width:2px;border-radius:7px;padding:2px 7px;background:var(--b2);color:var(--mut)}
+
+/* --- file rows --- */
+#fileList{display:flex;flex-direction:column;gap:8px;margin-top:14px}
+.frow{display:flex;align-items:center;gap:12px;padding:10px 12px;border:1px solid var(--line);border-radius:13px;
+  background:color-mix(in srgb,var(--b2) 60%,transparent);transition:border-color .2s,transform .2s var(--ease);
+  animation:row-in .34s cubic-bezier(.2,1.2,.4,1) both}
+.frow:hover{border-color:var(--line2);transform:translateX(2px)}
+.frow:nth-child(2){animation-delay:.04s}.frow:nth-child(3){animation-delay:.08s}
+.frow:nth-child(4){animation-delay:.12s}.frow:nth-child(5){animation-delay:.16s}
+@keyframes row-in{from{opacity:0;transform:translateY(-7px) scale(.985)}to{opacity:1;transform:none}}
+.ficon{width:40px;height:40px;border-radius:12px;display:grid;place-items:center;font-size:18px;flex:none;color:#fff;
+  background:linear-gradient(135deg,var(--p),color-mix(in srgb,var(--s) 70%,var(--p)));
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.25)}
+.fmeta{min-width:0;flex:1}.fname{font-weight:650;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fsize{font-size:12.5px;color:var(--mut);font-family:var(--mono)}
+.frm{background:none;border:0;color:var(--mut);cursor:pointer;font-size:15px;padding:8px;border-radius:8px;min-width:36px;min-height:36px}
+.frm:hover{color:var(--er);background:color-mix(in srgb,var(--er) 12%,transparent)}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:14px}
+.hint{font-size:12.5px;color:var(--mut);line-height:1.55}
+#pickerRow{margin-top:12px}
+
+.otp{display:flex;gap:8px;justify-content:center;margin:8px 0}
+.otp input{width:52px;height:60px;text-align:center;font-size:24px;font-weight:800;border-radius:13px;border:1.5px solid var(--line2);background:var(--b2);color:var(--bc);font-family:var(--mono)}
+.otp input:focus{border-color:var(--p);outline:none;box-shadow:0 0 0 3px color-mix(in srgb,var(--p) 30%,transparent)}
+input.code{background:var(--b2);border:1px solid var(--line2);color:var(--bc);border-radius:11px;padding:12px;font-size:16px;width:100%;text-align:center;letter-spacing:.25em;font-family:var(--mono)}
+.online{display:inline-flex;align-items:center;gap:7px;font-size:13px;font-weight:750}
+.count{font-variant-numeric:tabular-nums;font-weight:800}
+.alert{margin-top:12px;font-size:13px;padding:11px 13px;border-radius:12px;border:1px solid;line-height:1.55}
+.alert-warn{color:var(--wa);background:color-mix(in srgb,var(--wa) 10%,transparent);border-color:color-mix(in srgb,var(--wa) 35%,transparent)}
+.alert-ok{color:var(--su);background:color-mix(in srgb,var(--su) 9%,transparent);border-color:color-mix(in srgb,var(--su) 35%,transparent)}
+
+/* --- toast --- */
+#toast{position:fixed;bottom:calc(22px + env(safe-area-inset-bottom,0px));left:50%;transform:translateX(-50%) translateY(20px);opacity:0;transition:.25s var(--ease);
+  background:color-mix(in srgb,var(--n) 88%,transparent);color:var(--nc);padding:12px 20px;border-radius:13px;font-size:14px;font-weight:700;z-index:80;
+  border:1px solid var(--line2);box-shadow:var(--shadow);pointer-events:none;max-width:92vw;backdrop-filter:blur(12px);font-family:var(--mono);font-size:13px}
+#toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+[data-tip]{position:relative}
+[data-tip]:hover::after{content:attr(data-tip);position:absolute;bottom:calc(100% + 8px);left:50%;transform:translateX(-50%);
+  background:var(--n);color:var(--nc);font-size:12px;font-weight:600;padding:7px 11px;border-radius:9px;white-space:nowrap;z-index:40}
+
+/* --- reveal on scroll --- */
+.rv{opacity:0;transform:translateY(18px);transition:opacity .6s var(--ease),transform .6s var(--ease)}
+.rv.in{opacity:1;transform:none}
+.rv.d1{transition-delay:.06s}.rv.d2{transition-delay:.12s}.rv.d3{transition-delay:.18s}
+
+/* --- page enter --- */
+@keyframes page-in{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
+.hero,.flow>section{animation:page-in .55s var(--ease) both}
+.flow>section:nth-child(2){animation-delay:.08s}.flow>section:nth-child(3){animation-delay:.16s}.flow>section:nth-child(4){animation-delay:.22s}
+
+/* --- report page --- */
+.share-card{padding:22px;margin-top:16px}
+.share-card select,.share-card input{font-family:var(--font)}
+
+/* --- marketing sections: real page content, so they stay in the blocking shell
+   (only the howviz diagram below is deferred). Base rules first, then the
+   compaction overrides — the order matters: later wins at equal specificity. --- */
+/* --- features / timeline / faq --- */
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin:26px 0}
+.feat{padding:22px;transition:transform .25s var(--ease),border-color .25s}
+.feat:hover{transform:translateY(-3px);border-color:var(--line2)}
+.feat h3{margin:10px 0 6px;font-size:16px;letter-spacing:-.01em}.feat p{margin:0;color:var(--mut);font-size:13.5px;line-height:1.6}
+.feat .em{width:44px;height:44px;border-radius:14px;display:grid;place-items:center;font-size:21px;
+  background:linear-gradient(140deg,color-mix(in srgb,var(--p) 26%,transparent),color-mix(in srgb,var(--s) 16%,transparent));
+  border:1px solid var(--line2)}
+.timeline{padding:22px;margin-bottom:22px}
+.timeline ol{list-style:none;margin:14px 0 0;padding:0}
+.timeline li{position:relative;padding:0 0 18px 34px;color:var(--mut);font-size:14.5px;line-height:1.6}
+.timeline li::before{content:attr(data-n);position:absolute;left:0;top:0;width:24px;height:24px;border-radius:8px;display:grid;place-items:center;
+  font-size:12px;font-weight:800;font-family:var(--mono);color:var(--pc);background:linear-gradient(135deg,var(--p),color-mix(in srgb,var(--p) 50%,var(--s)))}
+.timeline li::after{content:"";position:absolute;left:11.5px;top:28px;bottom:0;width:1.5px;background:var(--line)}
+.timeline li:last-child::after{display:none}
+.timeline b{color:var(--bc)}
+
+details.faq{border:1px solid var(--line);border-radius:13px;padding:13px 16px;margin:8px 0;background:color-mix(in srgb,var(--b2) 50%,transparent)}
+details.faq summary{cursor:pointer;font-weight:700;font-size:14.5px}
+details.faq p{color:var(--mut);font-size:13.5px;margin:8px 0 2px;line-height:1.6}
+footer{border-top:1px solid var(--line);margin-top:30px;padding:22px 0 40px;color:var(--mut);font-size:13px;position:relative;z-index:2}
+footer .wrap{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:center}
+footer .fbrand{display:flex;align-items:center;gap:9px;font-weight:800;color:var(--bc)}
+footer .fbrand .logo{width:26px;height:26px;border-radius:8px}
+/* v4.1 compaction overrides (must follow the base rules above) */
+.grid3{margin:18px 0}
+.feat{padding:18px}
+.timeline{padding:18px;margin-bottom:16px}
+footer{margin-top:20px;padding:18px 0 30px}
+/* --- responsive --- */
+@media(max-width:900px){.flow{gap:14px}}
+/* Shed the optional nav items (server pill + 2 links) as soon as the row gets
+   tight. Below this the fixed-height bar had to shrink the wordmark, which wrapped
+   it to two lines and shifted the whole nav (measured 0.023 CLS). */
+@media(max-width:940px){.nav-links .hide-m{display:none!important}}
+@media(max-width:760px){.grid3{grid-template-columns:1fr}.hide-m{display:none!important}.pad{padding:17px}}
+@media(max-width:560px){
+  #pickerRow .btn{width:100%}
+  .stats{grid-template-columns:1fr 1fr 1fr;gap:6px}
+  .stat .v{font-size:13px}
+  .nav-links a.hide-m{display:none}
+  .hero{padding-top:36px}
+  .step-head .hint{display:none}
+}
+/* Phone widths: the wordmark is the first thing to go, not the controls. At
+   360–430px the row was 468px wide inside a 360px bar (clipped by
+   overflow-x:hidden, i.e. a silently cut-off theme picker). Logo mark only. */
+@media(max-width:480px){
+  .brand .word{display:none}
+  select.theme-sel{width:62px;padding:8px 4px}
+  .nav-links{gap:6px}
+  .wrap{padding:0 14px}
+}
+@media(prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation-duration:.001s!important;transition-duration:.001s!important}
+  .rot span{animation:none}.bg .orb{animation:none}.rv{opacity:1;transform:none}
+}
+/* --- receiver standby note: the connection card is never an empty box --- */
+.idle-note{display:flex;gap:11px;align-items:flex-start;border:1px dashed var(--line2);border-radius:13px;
+  padding:12px 14px;margin:4px 0 2px;background:color-mix(in srgb,var(--b2) 45%,transparent)}
+.idle-note b{display:block;font-size:13.5px}
+.idle-note .hint{margin:2px 0 0;display:block}
+/* --- v4.1 compaction: primary action above the fold --- */
+.flow{gap:12px;margin:10px 0 20px}
+.pad{padding:18px}
+.step-head{margin-bottom:10px}
+.trust{margin-bottom:14px}
+#drop,#codeZone{padding:26px 20px}
+.hero-compact{padding:18px 0 2px}
+@media(max-width:760px){.pad{padding:15px}}
+/* --- home: send + receive doors side by side on desktop, stacked on mobile --- */
+@media(min-width:901px){
+  #share{display:grid;grid-template-columns:1fr 1fr;gap:12px;align-items:stretch}
+  /* Twin panels: the grid equalises the cards; both zones size to content so no
+     dashed box carries empty space. (#codeZone used to flex-fill and centre,
+     which read as a bigger border with dead space up and below.) */
+}
+.step-head.center{justify-content:center;text-align:center}
+/* Picking files closes the receive door: the page becomes the send flow. */
+body.sharing #receiveEntry{display:none}
+/* The flash says *this panel* took a typed key (see initCodeEntry). */
+.otp-flash{animation:otp-flash .35s var(--ease)}
+@keyframes otp-flash{0%{box-shadow:0 0 0 3px color-mix(in srgb,var(--p) 55%,transparent)}100%{box-shadow:none}}
+/* Guide glow: fired when the Receive anchor is clicked and on loads already
+   carrying #receiveEntry. The class is removed on animationend, so it can never
+   stick. Reduced-motion users never see it (global kill-switch below covers it). */
+/* Guide glow: one smooth rise and fade that says "here". Single pulse on
+   purpose — an in-out pulse read as the panel flickering. The shadow lists keep
+   a constant length (transparent ring + card shadow) so every frame tweens
+   instead of flipping. The class is removed on animationend. */
+#receiveEntry.guide{animation:guide-glow 1.6s ease-in-out}
+@keyframes guide-glow{
+  0%{box-shadow:0 0 0 0 transparent,var(--shadow)}
+  35%{box-shadow:0 0 0 3px color-mix(in srgb,var(--p) 45%,transparent),var(--glow)}
+  70%{box-shadow:0 0 0 2px color-mix(in srgb,var(--p) 25%,transparent),var(--glow)}
+  100%{box-shadow:0 0 0 0 transparent,var(--shadow)}
+}
+/* --- v4.2: dynamic staged flow — later sections open only when live --- */
+body.sharing .hero,body.rx-active .hero{display:none}
+body.sharing .flow,body.rx-active .flow{gap:10px;margin-top:8px}
+body.sharing #drop.compact{padding:9px 12px}
+body.sharing .chat,body.rx-active .chat{max-height:150px}
+body.sharing .term-body,body.rx-active .term-body{padding:12px 14px 10px}
+/* --- v4.3: post-upload 2×2 dashboard — Payload | Handoff / Live link | Log --- */
+@media(min-width:901px){
+  body.sharing #share{display:grid;grid-template-columns:1fr 1fr;gap:12px;align-items:stretch}
+  body.sharing #termCard{display:flex;flex-direction:column}
+  body.sharing #termCard .term-body{flex:1;display:flex;flex-direction:column}
+  body.sharing #termCard .chat{flex:1;max-height:none;min-height:140px}
+}
+body.sharing #fileList{max-height:168px;overflow:auto}
+body.sharing .radial{--sz:76px}
+body.sharing .radial b{font-size:14px}
+body.sharing .pipe{min-height:80px;padding:8px 14px 24px}
+body.sharing .steps{margin:8px 0}
+body.sharing .stats{margin:8px 0}
+body.sharing .radial-wrap{margin:6px 0}
+body.sharing .alert{font-size:12px;padding:8px 11px;margin-top:8px}
+body.sharing .recv-list{max-height:120px}
+/* --- blog: article + index (inlined shell, zero extra requests) --- */
+.crumbs{font-size:13.5px;color:var(--mut);margin:18px 0 0}
+.crumbs a{color:var(--mut);text-decoration:none}
+.crumbs a:hover{color:var(--bc)}
+.prose{max-width:1080px;margin:0 auto}
+.prose .post-meta{display:flex;gap:10px;flex-wrap:wrap;align-items:center;color:var(--mut);font-size:14px;margin:12px 0 4px}
+.prose .post-meta .rt{font-family:var(--mono);font-size:12.5px;border:1px solid var(--line2);border-radius:7px;padding:3px 9px}
+.prose h1{font-size:clamp(34px,5vw,56px);line-height:1.06;letter-spacing:-.035em;margin:10px 0 12px}
+.prose .lede{color:var(--mut);font-size:clamp(17px,2.2vw,20px);line-height:1.65;margin:0 0 18px}
+.prose .lede b{color:var(--bc)}
+.prose h2{font-size:25px;letter-spacing:-.02em;margin:32px 0 10px;scroll-margin-top:82px}
+.prose h3{font-size:18px;margin:22px 0 8px}
+.prose p,.prose li{font-size:18px;line-height:1.7;color:var(--bc)}
+.prose p{margin:10px 0}
+.prose ul,.prose ol{margin:10px 0;padding-left:22px}
+.prose li{margin:6px 0}
+.prose li::marker{color:var(--p)}
+.prose a{color:var(--bc);text-decoration-color:color-mix(in srgb,var(--p) 65%,transparent);text-decoration-thickness:1.5px;text-underline-offset:3px}
+.prose a:hover{color:var(--p)}
+.prose strong{font-weight:750}
+.toc{border:1px solid var(--line2);border-radius:14px;padding:14px 18px;margin:18px 0;background:color-mix(in srgb,var(--b2) 55%,transparent)}
+.toc b{font-size:12.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--mut)}
+.toc ol{margin:8px 0 0;padding-left:20px}
+.toc li{margin:4px 0;font-size:15.5px}
+figure.diagram{margin:20px 0;border:1px solid var(--line2);border-radius:16px;overflow:hidden;background:color-mix(in srgb,var(--b2) 60%,transparent)}
+figure.diagram .fig-art{padding:18px 14px 6px}
+figure.diagram svg{width:100%;height:auto;display:block}
+figure.diagram figcaption{padding:10px 16px 14px;color:var(--mut);font-size:14px;line-height:1.6;border-top:1px dashed var(--line)}
+figure.diagram figcaption b{color:var(--bc)}
+.callout{border:1px solid;border-radius:14px;padding:13px 16px;margin:16px 0;font-size:15.5px;line-height:1.65}
+.callout b.t{display:block;font-size:12.5px;letter-spacing:.1em;text-transform:uppercase;margin-bottom:4px}
+.callout-ok{color:var(--su);background:color-mix(in srgb,var(--su) 8%,transparent);border-color:color-mix(in srgb,var(--su) 35%,transparent)}
+.callout-ok b.t{color:var(--su)}
+.callout-warn{color:var(--wa);background:color-mix(in srgb,var(--wa) 9%,transparent);border-color:color-mix(in srgb,var(--wa) 35%,transparent)}
+.callout-warn b.t{color:var(--wa)}
+.callout p{margin:6px 0;color:var(--bc)}
+table.compare{width:100%;border-collapse:collapse;margin:16px 0;font-size:15px;line-height:1.55;display:block;overflow-x:auto}
+table.compare th,table.compare td{text-align:left;padding:10px 12px;border:1px solid var(--line);white-space:nowrap}
+table.compare thead th{background:color-mix(in srgb,var(--p) 12%,transparent);font-size:12.5px;letter-spacing:.06em;text-transform:uppercase}
+table.compare td:first-child{font-weight:700;white-space:normal;min-width:140px}
+table.compare td.win{color:var(--su);font-weight:750}
+table.compare caption{text-align:left;color:var(--mut);font-size:12.5px;padding-bottom:8px;caption-side:top}
+.steps-ol{list-style:none;margin:14px 0;padding:0;counter-reset:step}
+.steps-ol li{position:relative;padding:0 0 16px 44px}
+.steps-ol li::before{counter-increment:step;content:counter(step);position:absolute;left:0;top:0;width:30px;height:30px;border-radius:10px;display:grid;place-items:center;font-size:13px;font-weight:800;font-family:var(--mono);color:var(--pc);background:linear-gradient(135deg,var(--p),color-mix(in srgb,var(--p) 50%,var(--s)))}
+.steps-ol li b{font-size:16.5px}
+.steps-ol li p{margin:4px 0 0;color:var(--mut);font-size:15px}
+.cta-band{border-radius:18px;padding:26px 24px;margin:26px 0;text-align:center;position:relative;overflow:hidden;
+  background:linear-gradient(135deg,color-mix(in srgb,var(--p) 20%,var(--b2)),var(--b2));border:1px solid color-mix(in srgb,var(--p) 40%,var(--line2))}
+.cta-band h3{margin:0 0 6px;font-size:23px;letter-spacing:-.02em}
+.cta-band p{margin:0 0 16px;color:var(--mut);font-size:15.5px}
+.blog-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:14px;margin:20px 0}
+.post-card{display:flex;flex-direction:column;text-decoration:none!important;border-radius:18px;overflow:hidden;transition:transform .25s var(--ease),border-color .25s}
+.post-card:hover{transform:translateY(-3px);border-color:var(--line2)}
+.post-card .thumb{padding:16px 16px 0}
+.post-card .thumb svg{width:100%;height:auto;display:block;border-radius:12px;border:1px solid var(--line)}
+.post-card .pc-body{padding:16px 18px 18px;display:flex;flex-direction:column;gap:8px;flex:1}
+.post-card .k{font-size:11.5px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:var(--p)}
+.post-card h3{margin:0;font-size:20px;letter-spacing:-.02em;line-height:1.3}
+.post-card p{margin:0;color:var(--mut);font-size:15px;line-height:1.6;flex:1}
+.post-card .go{font-size:14.5px;font-weight:750;color:var(--bc)}
+.post-card:hover .go{color:var(--p)}
+.rel{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:16px 0}
+.rel a{text-decoration:none!important;border-radius:14px;padding:14px;transition:border-color .2s,transform .2s var(--ease)}
+.rel a:hover{border-color:var(--line2);transform:translateY(-2px)}
+.rel .k{font-size:10.5px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--p)}
+.rel b{display:block;font-size:15px;margin-top:4px;line-height:1.4}
+@media(max-width:760px){.blog-grid{grid-template-columns:1fr}.rel{grid-template-columns:1fr}}
+/* --- blog: wide article layout (desktop) ---
+   The card interior becomes two columns: a sticky "on this page" rail on the
+   left and the article on the right — so the full card width is used instead
+   of centring a narrow column in it. The header (meta/H1/lede) spans both.
+   Pure CSS over the existing DOM (every post is meta,h1,lede,toc,…), no HTML
+   changes; below 1100px it falls back to the single column with inline TOC. */
+@media(min-width:1100px){
+  .blog-grid{grid-template-columns:repeat(3,1fr)}
+  .prose article.card{display:grid;grid-template-columns:260px minmax(0,1fr);gap:0 36px;align-items:start}
+  .prose article.card>*{grid-column:2;min-width:0}
+  .prose article.card>.post-meta,.prose article.card>h1,.prose article.card>.lede{grid-column:1/-1}
+  .prose article.card>nav.toc{grid-column:1;grid-row:4/span 100;position:sticky;top:96px;margin:32px 0 0}
+}

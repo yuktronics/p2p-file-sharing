@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="google-site-verification" content="g7G7lBm6DdK0mUc0cGqCSeSqPNqg5x-NeZyLFA4lq_o" />
+<title>Report a transfer — p2p file sharing</title>
+<meta name="description" content="Report an unwanted transfer. Confirmed abuse disables the room immediately, and the operator reviews every report.">
+<!-- One report page per room means an unbounded URL space, and a report form is
+     a utility screen with no search value. Keep it crawlable (so this noindex is
+     read — a robots.txt disallow would silently defeat it) but out of the index. -->
+<meta name="robots" content="noindex,nofollow">
+<meta name="twitter:card" content="summary">
+<link rel="stylesheet" href="/styles.css">
+<link rel="preload" as="style" href="/states.css" onload="this.onload=null;this.rel='stylesheet'">
+<noscript><link rel="stylesheet" href="/states.css"></noscript>
+<script src="/app.js" defer></script>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='15' fill='%231a1a1f'/%3E%3Crect x='8' y='23' width='10' height='3.6' rx='1.8' fill='%23ff5a1f'/%3E%3Crect x='5' y='30.2' width='13' height='3.6' rx='1.8' fill='%23ff5a1f' opacity='.65'/%3E%3Crect x='8' y='37.4' width='10' height='3.6' rx='1.8' fill='%23ff5a1f' opacity='.35'/%3E%3Cpath d='M26 14 h11 l7 7 v29 h-18 Z' fill='%23f4f1e8'/%3E%3Cpath d='M37 14 v7 h7' fill='%23ff5a1f'/%3E%3C/svg%3E">
+</head>
+<body>
+<div class="bg" aria-hidden="true"><div class="orb o1"></div><div class="orb o2"></div><div class="grid"></div><div class="noise"></div></div>
+<nav class="top"><div class="wrap nav-inner">
+  <a class="brand" href="/" aria-label="p2p file sharing home" translate="no"><span class="logo" aria-hidden="true"><svg viewBox="0 0 64 64"><rect width="64" height="64" rx="15" fill="#1a1a1f"/><rect x="8" y="23" width="10" height="3.6" rx="1.8" fill="#ff5a1f"/><rect x="5" y="30.2" width="13" height="3.6" rx="1.8" fill="#ff5a1f" opacity=".65"/><rect x="8" y="37.4" width="10" height="3.6" rx="1.8" fill="#ff5a1f" opacity=".35"/><path d="M26 14 h11 l7 7 v29 h-18 Z" fill="#f4f1e8"/><path d="M37 14 v7 h7" fill="#ff5a1f"/></svg></span> <span class="word">p2p <em>file sharing</em></span></a>
+  <div class="nav-links"><a href="/">Send</a><a href="/#receiveEntry">Receive</a><a href="/blog">Blog</a></div>
+</div></nav>
+<div class="wrap" style="max-width:560px">
+  <section class="hero" style="padding-bottom:0">
+    <h1>Report <span class="grad">this transfer</span></h1>
+    <p class="sub">An operator reviews every report. Confirmed abuse kills the room instantly.</p>
+  </section>
+  <section class="card share-card">
+    <div class="row" style="margin-top:0">
+      <select id="reason" class="theme-sel" style="flex:1;padding:12px" aria-label="Reason">
+        <option value="spam">Spam / unsolicited files</option>
+        <option value="malware">Malware / suspicious executable</option>
+        <option value="phishing">Phishing / impersonation</option>
+        <option value="csam">Child safety concern</option>
+        <option value="other">Something else</option>
+      </select>
+    </div>
+    <div class="row"><input class="code" id="contact" maxlength="120" placeholder="Contact (optional) — email or handle" style="letter-spacing:normal;font-size:14px"></div>
+    <div class="row" style="justify-content:center"><button class="btn" id="send">Send report</button></div>
+    <div class="row" style="justify-content:center"><span class="hint" id="msg"></span></div>
+  </section>
+</div>
+<div id="toast" role="status"></div>
+<script>
+// app.js is deferred (non-blocking), so this must wait for DOMContentLoaded —
+// which fires after every deferred script has executed.
+document.addEventListener("DOMContentLoaded", () => {
+  const msg = document.getElementById("msg");
+  const btn = document.getElementById("send");
+  if (!btn) return;
+  // The footer links to /report/ with no room id, and a user may also land here
+  // from a pasted URL. Without this the submit would POST to /api/rooms//report
+  // and report nothing at all, while looking like it had worked. A report is only
+  // actionable if it names a room, so ask for the link instead of pretending.
+  const raw = location.pathname.split("/").filter(Boolean)[1] || "";
+  const id = decodeURIComponent(raw);
+  if (!id) {
+    document.getElementById("reason").closest(".card").innerHTML =
+      `<h2 style="margin-top:0">Report a transfer</h2>
+       <p class="sub">Open the share link you received, then choose <b>Report this transfer</b> on that page.</p>`;
+    return;
+  }
+  btn.onclick = async () => {
+    const reason = document.getElementById("reason").value;
+    const contact = document.getElementById("contact").value.trim();
+    try {
+      const r = await fetch(apiUrl(`/api/rooms/${encodeURIComponent(id)}/report`), {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reason, contact }),
+      });
+      if (r.status === 201) { msg.textContent = "✓ Received — thank you."; toast("Report received ✓"); }
+      // 200 = filed, but the room was already disabled by an earlier report, so
+      // there is nothing left to do. It is a success, not a failure.
+      else if (r.status === 200) { msg.textContent = "✓ Received — this transfer is already disabled."; toast("Report received ✓"); }
+      else if (r.status === 429) msg.textContent = "Too many reports — try again in a minute.";
+      else if (r.status === 404) msg.textContent = "Transfer not found (link expired?).";
+      else msg.textContent = "Something went wrong — try again.";
+    } catch { msg.textContent = "Network error — try again."; }
+  };
+});
+</script>
+</body>
+</html>

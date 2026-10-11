@@ -1,0 +1,55 @@
+// Cloudflare Workers static-assets config.
+//
+// The dashboard is Workers, not Pages (Workers & Pages > your project > General >
+// "Danger zone / Delete Worker"). Both platforms read _headers and _redirects
+// from the asset directory, so the output of build-pages.mjs is consumed
+// unchanged — the only thing Pages did implicitly and this file states
+// explicitly is WHICH directory holds the assets.
+//
+// Paired build settings (dash > Settings > Builds):
+//   Build command           node signal/web/build-pages.mjs
+//   Deploy command          npx wrangler deploy
+//   Root directory          (empty = repo root)
+//   Build variables         SIGNAL_URL, SITE_URL   (see below)
+//
+// The build command runs BEFORE this file is read, so wrangler `vars` cannot
+// feed it. SIGNAL_URL and SITE_URL must be Build variables in the dashboard
+// (or inline in the build command). That is deliberate: build-pages.mjs fails
+// closed when SIGNAL_URL is missing, so a misconfigured deploy can never ship a
+// build pointing at the wrong backend.
+{
+	"$schema": "node_modules/wrangler/config-schema.json",
+	// Renamed with the product. First deploy under this name provisions a NEW
+	// Worker: afterwards, move the custom domain to it in the dashboard
+	// (Workers → p2p-file-sharing → Settings → Domains & Routes).
+	"name": "p2p-file-sharing",
+	"compatibility_date": "2026-09-30",
+
+	// No "main": this Worker serves static files only. There is no Worker script.
+	// _headers and _redirects are read from this directory and are never served
+	// as assets themselves.
+	"assets": {
+		"directory": "./signal/web/dist",
+
+		// "auto-trailing-slash" is REQUIRED, and it constrains _redirects.
+		//
+		// It is what makes "/" serve index.html, so "none" is not an option —
+		// with html_handling off, the site root 404s.
+		//
+		// Its side effect is that any .html request 307s to its extensionless
+		// form, and that fires on the TARGET of a 200 rewrite too. So every
+		// 200-rewrite target in _redirects must be extensionless: /r/<id> ->
+		// /receive resolves to receive.html without a 307. Pointing it at
+		// /receive.html instead is what stripped the room id from every share
+		// link on the first deploy, and turned /privacy into a redirect loop
+		// (301 -> /privacy.html -> 307 -> /privacy, forever).
+		//
+		// build-pages.mjs enforces the extensionless-target half of this.
+		"html_handling": "auto-trailing-slash"
+	}
+
+	// not_found_handling is left at the default ("none"): unknown paths must 404
+	// rather than silently render index.html, so a stale share link fails loudly
+	// instead of showing the sender page. The /r/* -> /receive.html rewrite is
+	// what makes real room links resolve, and it lives in _redirects.
+}

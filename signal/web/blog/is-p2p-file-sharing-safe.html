@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="google-site-verification" content="g7G7lBm6DdK0mUc0cGqCSeSqPNqg5x-NeZyLFA4lq_o" />
+<title>Is P2P file sharing safe? How the encryption works (2026)</title>
+<meta name="description" content="What DTLS encryption covers, what the server can and can't see, and the 5 checks to run before trusting any file transfer tool with private files.">
+<link rel="canonical" href="{{SITE_URL}}/blog/is-p2p-file-sharing-safe">
+<meta name="robots" content="index,follow,max-image-preview:large">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="p2p file sharing">
+<meta property="og:locale" content="en">
+<meta property="og:url" content="{{SITE_URL}}/blog/is-p2p-file-sharing-safe">
+<meta property="og:title" content="Is P2P file sharing safe? How the encryption works">
+<meta property="og:description" content="DTLS end-to-end, zero stored bytes, and what the server really sees. The five checks to run on any transfer tool.">
+<meta property="og:image" content="{{SITE_URL}}/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="How P2P encryption works">
+<meta property="article:published_time" content="2026-10-02">
+<meta property="article:modified_time" content="2026-10-02">
+<meta property="article:section" content="Security">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Is P2P file sharing safe?">
+<meta name="twitter:description" content="What the encryption covers, what the server sees, and 5 checks for any tool.">
+<meta name="twitter:image" content="{{SITE_URL}}/og.png">
+<meta name="theme-color" content="#1a1a1f">
+<script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"WebSite","@id":"{{SITE_URL}}/#website","url":"{{SITE_URL}}/","name":"p2p file sharing","inLanguage":"en"},{"@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Home","item":"{{SITE_URL}}/"},{"@type":"ListItem","position":2,"name":"Blog","item":"{{SITE_URL}}/blog"},{"@type":"ListItem","position":3,"name":"Is P2P file sharing safe?","item":"{{SITE_URL}}/blog/is-p2p-file-sharing-safe"}]},{"@type":"BlogPosting","headline":"Is P2P file sharing safe? How the encryption actually works","description":"What DTLS encryption covers, what the server can and can't see, and the five checks to run before trusting any file transfer tool.","url":"{{SITE_URL}}/blog/is-p2p-file-sharing-safe","mainEntityOfPage":"{{SITE_URL}}/blog/is-p2p-file-sharing-safe","image":"{{SITE_URL}}/og.png","inLanguage":"en","datePublished":"2026-10-02","dateModified":"2026-10-02","author":{"@type":"Organization","name":"p2p file sharing","url":"{{SITE_URL}}/"},"publisher":{"@type":"Organization","name":"p2p file sharing","url":"{{SITE_URL}}/"}}]}</script>
+<link rel="stylesheet" href="/styles.css">
+<link rel="preload" as="style" href="/states.css" onload="this.onload=null;this.rel='stylesheet'">
+<noscript><link rel="stylesheet" href="/states.css"></noscript>
+<script src="/app.js" defer></script>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='15' fill='%231a1a1f'/%3E%3Crect x='8' y='23' width='10' height='3.6' rx='1.8' fill='%23ff5a1f'/%3E%3Crect x='5' y='30.2' width='13' height='3.6' rx='1.8' fill='%23ff5a1f' opacity='.65'/%3E%3Crect x='8' y='37.4' width='10' height='3.6' rx='1.8' fill='%23ff5a1f' opacity='.35'/%3E%3Cpath d='M26 14 h11 l7 7 v29 h-18 Z' fill='%23f4f1e8'/%3E%3Cpath d='M37 14 v7 h7' fill='%23ff5a1f'/%3E%3C/svg%3E">
+</head>
+<body>
+<div class="bg" aria-hidden="true"><div class="orb o1"></div><div class="orb o2"></div><div class="grid"></div><div class="noise"></div></div>
+<nav class="top"><div class="wrap nav-inner">
+  <a class="brand" href="/" aria-label="p2p file sharing home"><span class="logo" aria-hidden="true"><svg viewBox="0 0 64 64"><rect width="64" height="64" rx="15" fill="#1a1a1f"/><rect x="8" y="23" width="10" height="3.6" rx="1.8" fill="#ff5a1f"/><rect x="5" y="30.2" width="13" height="3.6" rx="1.8" fill="#ff5a1f" opacity=".65"/><rect x="8" y="37.4" width="10" height="3.6" rx="1.8" fill="#ff5a1f" opacity=".35"/><path d="M26 14 h11 l7 7 v29 h-18 Z" fill="#f4f1e8"/><path d="M37 14 v7 h7" fill="#ff5a1f"/></svg></span> <span class="word">p2p <em>file sharing</em></span></a>
+  <div class="nav-links"><a href="/">Send</a><a href="/#receiveEntry">Receive</a><a href="/blog">Blog</a><a href="/contact">Contact</a>
+    <button class="icon-btn" id="themeBtn" aria-label="Toggle theme" data-tip="Theme">◐</button></div>
+</div></nav>
+
+<div class="wrap"><div class="prose">
+  <p class="crumbs"><a href="/">Home</a> · <a href="/blog">Blog</a> · Security</p>
+  <article class="card pad" aria-label="Is P2P file sharing safe">
+    <div class="post-meta"><span>Oct 2, 2026</span><span class="rt">9 min read</span><span>Security</span></div>
+    <h1>Is P2P file sharing <span class="grad">safe?</span></h1>
+    <p class="lede">Short answer: <b>yes — when it is true P2P.</b> File bytes travel over a <b>DTLS-encrypted channel directly between the two browsers</b>, and the server never receives them. But "encrypted" gets printed on a lot of boxes. Here's how to tell the real thing from marketing.</p>
+
+    <nav class="toc" aria-label="In this guide"><b>On this page</b>
+      <ol>
+        <li><a href="#how-encryption">How the encryption actually works</a></li>
+        <li><a href="#server-sees">What the server sees (and never sees)</a></li>
+        <li><a href="#five-checks">5 checks before you trust any tool</a></li>
+        <li><a href="#relay">The relay exception, explained</a></li>
+        <li><a href="#faq">Questions, answered</a></li>
+      </ol>
+    </nav>
+
+    <h2 id="how-encryption">How the encryption actually works</h2>
+    <p>When two browsers open a WebRTC data channel, they negotiate encryption with <strong>DTLS (Datagram TLS)</strong> — the same family of cryptography that protects HTTPS, adapted for real-time traffic. The keys are agreed directly between the two devices during connection setup; no third party holds them, and every 256&nbsp;KB chunk of your file is encrypted before it leaves the sender.</p>
+    <p>The practical result: someone watching the network sees scrambled packets and packet sizes. They cannot see file names being transferred in-band, file contents, or anything usable — only that an encrypted connection happened. Our full data policy is in the <a href="/privacy">privacy policy</a>.</p>
+
+    <figure class="diagram" aria-label="Diagram: signaling vs file bytes">
+      <div class="fig-art"><svg viewBox="0 0 640 250" role="img" aria-label="Signaling goes via the server as dotted lines; file bytes go directly as a solid encrypted beam">
+        <circle cx="90" cy="125" r="36" fill="#242429" stroke="#ff5a1f" stroke-width="2"/><text x="90" y="135" font-size="24" text-anchor="middle">🖥️</text><text x="90" y="185" font-size="12" fill="#a8a49a" text-anchor="middle" font-family="monospace">you</text>
+        <circle cx="550" cy="125" r="36" fill="#242429" stroke="#3ddc97" stroke-width="2"/><text x="550" y="135" font-size="24" text-anchor="middle">📥</text><text x="550" y="185" font-size="12" fill="#a8a49a" text-anchor="middle" font-family="monospace">receiver</text>
+        <rect x="285" y="30" width="70" height="56" rx="10" fill="#242429" stroke="#6f6c64" stroke-width="2"/><text x="320" y="56" font-size="22" text-anchor="middle">📡</text><text x="320" y="76" font-size="10" fill="#a8a49a" text-anchor="middle" font-family="monospace">server</text>
+        <line x1="110" y1="100" x2="290" y2="55" stroke="#6f6c64" stroke-width="2" stroke-dasharray="6 5"/><line x1="530" y1="100" x2="350" y2="55" stroke="#6f6c64" stroke-width="2" stroke-dasharray="6 5"/>
+        <text x="320" y="115" font-size="11" fill="#a8a49a" text-anchor="middle" font-family="monospace">setup only · KBs</text>
+        <line x1="126" y1="140" x2="514" y2="140" stroke="#ff5a1f" stroke-width="6" stroke-linecap="round"/><circle cx="200" cy="140" r="9" fill="#ffb25e"/><circle cx="320" cy="140" r="9" fill="#ffb25e"/><circle cx="440" cy="140" r="9" fill="#ffb25e"/>
+        <text x="320" y="168" font-size="12" fill="#3ddc97" text-anchor="middle" font-family="monospace">🔒 file bytes · DTLS · 0 via server</text>
+      </svg></div>
+      <figcaption><b>Two planes, strictly separated.</b> Dotted lines: connection setup through the server (kilobytes, no file data). Solid beam: your encrypted files, device to device. The server cannot decrypt what never passes through it.</figcaption>
+    </figure>
+
+    <h2 id="server-sees">What the server sees (and never sees)</h2>
+    <table class="compare">
+      <caption>Exactly what touches our server during a transfer.</caption>
+      <thead><tr><th>Data</th><th>Server sees it?</th><th>Why</th></tr></thead>
+      <tbody>
+      <tr><td>Room ID, file names + sizes</td><td>Yes (in memory)</td><td>Receiver must preview what's on offer</td></tr>
+      <tr><td>Connection setup (SDP/ICE)</td><td>Relayed, not stored</td><td>Browsers need introductions</td></tr>
+      <tr><td>Your IP (for rate limiting)</td><td>Transiently</td><td>Abuse throttling, never logged with transfers</td></tr>
+      <tr><td>File contents</td><td class="win">Never</td><td>Bytes take the direct beam, not the server</td></tr>
+      <tr><td>Anything after you close the tab</td><td class="win">Nothing — room deleted</td><td>Memory only, no database</td></tr>
+      </tbody>
+    </table>
+
+    <h2 id="five-checks">5 checks before you trust any tool</h2>
+    <ol class="steps-ol">
+      <li><b>Can the provider show you what it stores?</b><p>A privacy page that lists exact data (like ours does) beats "military-grade encryption" slogans. Vague means unverifiable.</p></li>
+      <li><b>Does "encrypted" mean end-to-end?</b><p>TLS-to-server is table stakes — the server still sees plaintext. End-to-end (DTLS/WebRTC) means it can't. Ask which one.</p></li>
+      <li><b>Is there anything to breach?</b><p>No stored files = no file breach. An account database, stored transfers, and analytics SDKs are all breach surface.</p></li>
+      <li><b>What happens when you leave?</b><p>Close-tab-means-gone is stronger than a 30-day retention toggle you'll never open.</p></li>
+      <li><b>Are files verified on arrival?</b><p>Every file here carries a byte count + SHA-256 digest; corrupt arrivals fail loudly and save nothing. A tool that can't prove integrity can't claim safety.</p></li>
+    </ol>
+
+    <h2 id="relay">The relay exception, explained</h2>
+    <p>On strict corporate networks, a direct path may be impossible — so the connection can fall back to a <strong>TURN relay</strong>. The relay operator can observe that an encrypted connection happened and how much data crossed, but <strong>still not the contents</strong>: DTLS terminates at the two devices, not at the relay. When no relay is needed, nothing extra is involved at all. Honest tools disclose this; now you know it too.</p>
+    <div class="callout callout-warn"><b class="t">Your part</b><p>Encryption can't save you from sending to the wrong person. Check the file list on the receive page, confirm the sender through a second channel for sensitive files, and report anything suspicious — confirmed abuse disables rooms immediately.</p></div>
+
+    <h2 id="faq">Questions, answered</h2>
+    <details class="faq" open><summary>Can the operator read my files?</summary><p>No. File bytes never reach the server, so there is nothing to read, scan, or hand over — even if asked. The server sees room metadata and connection setup only.</p></details>
+    <details class="faq"><summary>Is P2P safer than Google Drive?</summary><p>For confidentiality from the provider, yes: Drive stores your files on Google's infrastructure. For availability (fetch while the sender sleeps), Drive wins. Pick per job — see <a href="/blog/wetransfer-alternative">the honest comparison</a>.</p></details>
+    <details class="faq"><summary>What about malware in received files?</summary><p>Integrity checks prove a file arrived intact — not that it's benign. Treat unexpected executables with suspicion, scan downloads, and report abuse; filenames are validated against spoofing tricks server-side.</p></details>
+    <details class="faq"><summary>Does incognito / VPN change anything?</summary><p>The transfer encryption is identical. A VPN hides your IP from the server; incognito only affects local history. Neither weakens DTLS.</p></details>
+
+    <div class="cta-band">
+      <h3>The safest transfer is the one that leaves nothing behind</h3>
+      <p>Encrypted in transit. Zero bytes stored. Gone when you close the tab.</p>
+      <p style="margin:0"><a class="btn btn-lg" href="/" style="text-decoration:none;display:inline-block">Send privately →</a></p>
+    </div>
+
+    <h3>Keep reading</h3>
+    <div class="rel">
+      <a class="card" href="/blog/send-files-without-account"><span class="k">No signup</span><b>Send files without an account</b></a>
+      <a class="card" href="/blog/wetransfer-alternative"><span class="k">Comparison</span><b>A private WeTransfer alternative</b></a>
+      <a class="card" href="/blog/send-large-videos-photos"><span class="k">Creators</span><b>Send large videos and RAW photos</b></a>
+    </div>
+    <aside class="callout" aria-label="Open source">
+      <b class="t">Open source</b>
+      This tool is free and open source. The <a href="https://github.com/yuktronics/p2p-file-sharing" target="_blank" rel="noopener"><span translate="no">yuktronics/p2p-file-sharing</span></a> repository holds the full code — since file bytes never touch a server, you can verify that claim yourself. Found a bug? <a href="https://github.com/yuktronics/p2p-file-sharing/issues" target="_blank" rel="noopener">Open an issue</a>.
+    </aside>
+  </article>
+
+  <footer><div class="wrap" style="padding:0">
+    <span class="fbrand"><span class="logo"><svg viewBox="0 0 64 64"><rect width="64" height="64" rx="15" fill="#1a1a1f"/><rect x="8" y="23" width="10" height="3.6" rx="1.8" fill="#ff5a1f"/><rect x="5" y="30.2" width="13" height="3.6" rx="1.8" fill="#ff5a1f" opacity=".65"/><rect x="8" y="37.4" width="10" height="3.6" rx="1.8" fill="#ff5a1f" opacity=".35"/><path d="M26 14 h11 l7 7 v29 h-18 Z" fill="#f4f1e8"/><path d="M37 14 v7 h7" fill="#ff5a1f"/></svg></span> p2p file sharing · <a href="/">Send files</a> · <a href="/privacy">Privacy</a></span>
+    <span class="hint"><a href="/blog">All guides</a></span>
+  </div></footer>
+</div></div>
+</body>
+</html>

@@ -1,0 +1,26 @@
+# cert-watchdog — daily certificate and ACME dependency check.
+#
+# sslh owns public TCP :443, so Caddy cannot, and Caddy must therefore keep a
+# public TCP :80 listener: it is the only port left where ACME HTTP-01 can be
+# solved. Caddy does not attempt renewal until roughly day 60 of a 90-day
+# certificate, so if that listener is ever removed the failure is silent for a
+# month and then the product is offline. This closes that window to one day.
+[Unit]
+Description=Certificate expiry and ACME listener watchdog
+Documentation=file:/usr/local/sbin/cert-watchdog
+After=caddy.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/cert-watchdog
+# Reading Caddy's certificate store needs root (it is 750 caddy:caddy).
+User=root
+# Logging to the journal is the whole point, so do not swallow the output.
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=cert-watchdog
+# A hung run must not overlap the next one.
+TimeoutStartSec=120
+
+[Install]
+WantedBy=multi-user.target

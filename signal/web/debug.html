@@ -1,0 +1,48 @@
+<!doctype html>
+<!-- /debug — DEV-ONLY signaling loopback harness. Not product UI. -->
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>signal debug</title>
+<style>body{font:14px system-ui;max-width:760px;margin:24px auto;padding:0 16px}button{margin:4px;padding:8px 14px}
+pre{background:#111;color:#cfc;padding:12px;border-radius:8px;max-height:320px;overflow:auto}</style></head>
+<body>
+<h1>signal debug <small>(dev harness, not product UI)</small></h1>
+<button id="bRoom">1 · create room</button>
+<button id="bSig" disabled>2 · WS loopback (sender↔receiver offer/answer/ice)</button>
+<button id="bTurn" disabled>3 · fetch TURN creds</button>
+<pre id="log"></pre>
+<script>
+const log = (...a) => { document.getElementById('log').textContent += a.join(' ') + '\n'; };
+let roomId;
+document.getElementById('bRoom').onclick = async () => {
+  const r = await fetch('/api/rooms', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ files: [{ name: 'hello.txt', size: 12, mime: 'text/plain' }], nearby: true }) }).then(x => x.json());
+  roomId = r.id; log('room', JSON.stringify(r));
+  document.getElementById('bSig').disabled = false;
+  document.getElementById('bTurn').disabled = false;
+};
+document.getElementById('bSig').onclick = () => {
+  const s = new WebSocket(`ws://${location.host}/ws/rooms/${roomId}?role=sender&peer=sender`);
+  const x = new WebSocket(`ws://${location.host}/ws/rooms/${roomId}?role=receiver&peer=rx-test`);
+  const send = (ws, o) => {
+    if (ws.readyState !== 1) { log('send-skip state=' + ws.readyState, o.kind); return; }
+    try { ws.send(JSON.stringify(o)); } catch (err) { log('send-err', String(err)); }
+  };
+  s.onmessage = e => { const m = JSON.parse(e.data); log('S <-', m.kind, 'seq=' + m.seq);
+    if (m.kind === 'answer') log('sender: got answer, loopback complete ✓'); };
+  x.onmessage = e => { const m = JSON.parse(e.data); log('X <-', m.kind, 'seq=' + m.seq);
+    if (m.kind === 'offer') { log('offer-branch, x.state=' + x.readyState); send(x, { from: 'rx-test', to: 'sender', kind: 'answer', payload: '{"fake":"answer"}' }); log('answer-sent'); }
+    if (m.kind === 'presence') log('presence:', m.payload); };
+  s.onopen = () => {
+    if (x.readyState === 1) kickoff();
+    else x.onopen = kickoff;
+  };
+  const kickoff = () => {
+    send(s, { from: 'sender', to: 'receivers', kind: 'offer', payload: '{"fake":"offer"}' });
+    send(x, { from: 'rx-test', to: 'sender', kind: 'ice', payload: '{"fake":"ice"}' });
+  };
+};
+document.getElementById('bTurn').onclick = async () => {
+  const r = await fetch(`/api/rooms/${roomId}/turn`);
+  log('turn', r.status, await r.text());
+};
+</script></body></html>

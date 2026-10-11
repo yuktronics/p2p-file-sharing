@@ -1,0 +1,24 @@
+# local env / secrets — never commit (see docs/CONFIG.md for variable list)
+.env
+*.env
+signal.env
+admin-token
+*.pem
+*.key
+id_rsa*
+ssh-key*
+# archify working files + delivery receipts (regenerable; keep only the
+# published architecture.html + docs/architecture.svg)
+.archify/
+*.finalize*.json
+*.browser-check.json
+*.delivery.json
+*.delivery-pending.json
+# generated Cloudflare Pages bundle (regenerate with `npm run build` in signal/web)
+signal/web/dist/
+# JS deps
+**/node_modules/
+# local release bundle
+p2p-file-sharing-release.tgz
+# Strix pentest runs (may contain PoCs — never commit)
+strix_runs/

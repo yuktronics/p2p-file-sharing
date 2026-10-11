@@ -1,0 +1,113 @@
+#!/bin/bash
+# ══════════════════════════════════════════════════════════════════════════
+# cert-watchdog — the safety net for a dependency that cannot be engineered
+# away on this build.
+#
+# The dependency
+# ──────────────
+# sslh owns public TCP :443, so Caddy cannot. Caddy must therefore keep a
+# public TCP :80 listener: that is the only port left where ACME HTTP-01 can be
+# solved, and TLS-ALPN-01 is doubly dead here (it needs TCP :443, and the
+# h1/h2 backend is configured without the acme-tls/1 ALPN).
+#
+# DNS-01 would remove the dependency entirely, but the distro Caddy build has
+# NO dns provider modules (checked: caddy list-modules shows 31 tls.* modules
+# and zero tls.issuance.acme.dns.*). Using it means replacing the packaged
+# binary with an xcaddy build and losing apt-managed updates. Not worth it.
+#
+# Why a watchdog rather than better documentation
+# ──────────────────────────────────────────────
+# Caddy renews a certificate once less than one third of its lifetime remains
+# — around day 60 of 90. So a broken :80 listener means nothing is even
+# ATTEMPTED for a month, and the failure surfaces only when the cert finally
+# lapses and the whole product goes offline. That is a 60-day silent fuse.
+# This runs daily and turns it into a same-day alarm, and in the critical
+# window it restarts Caddy once so a transient failure can still self-heal.
+# ══════════════════════════════════════════════════════════════════════════
+set -uo pipefail
+
+WARN_DAYS=${WARN_DAYS:-30}   # Caddy tries to renew around day 60; alarm well before.
+CRIT_DAYS=${CRIT_DAYS:-14}   # Past this, a failed renewal is close to terminal.
+
+# Overridable so the failure paths can actually be exercised. Hard-assigning
+# these made the watchdog untestable: passing CERT_ROOT=/nonexistent was
+# silently ignored and the run reported "0 problems" against the real certs,
+# which is precisely the false-healthy result this script exists to prevent.
+CERT_ROOT=${CERT_ROOT:-/var/lib/caddy/.local/share/caddy/certificates}
+DOMAINS=${DOMAINS:-"api-files.example.com turn-files.example.com"}
+# Point at a port nothing listens on to exercise the "listener gone" branch
+# without taking a working site offline.
+ACME_PORT=${ACME_PORT:-80}
+# NO_RESTART=1 in tests, so the critical-window nudge cannot bounce Caddy.
+NO_RESTART=${NO_RESTART:-0}
+
+log() { logger -t cert-watchdog -p "$1" -- "$2"; }
+status=0   # a COUNT, not a flag: the summary is the part a human reads, and "1 problem" after two CRITICALs is not a report
+
+# ── 1. Is the ACME listener still there? ────────────────────────────────────
+# This is the actual dependency, so check it directly rather than inferring it
+# from certificate dates: a missing :80 shows up here on day 1 instead of
+# showing up as an outage on day 60.
+if ! ss -ltn | grep ":$ACME_PORT " >/dev/null; then
+  log err "CRITICAL: nothing is listening on TCP :$ACME_PORT. ACME HTTP-01 renewal will fail and both certificates will expire unnoticed. Fix: restore the :80 site in /etc/caddy/Caddyfile (backup at /etc/caddy/Caddyfile.acme-backup) and restart caddy."
+  status=$((status + 1))
+elif ! ss -ltnp | grep ":$ACME_PORT " | grep caddy >/dev/null; then
+  log err "CRITICAL: TCP :$ACME_PORT is held by something other than Caddy ($(ss -ltnp | grep ":$ACME_PORT " | head -1)). ACME renewal will fail."
+  status=$((status + 1))
+else
+  log info "ACME listener ok: Caddy holds public TCP :$ACME_PORT"
+fi
+
+# ── 2. Certificate expiry ───────────────────────────────────────────────────
+# No `grep -q` anywhere: with pipefail in a script it turns an upstream SIGPIPE
+# into a false failure, which is how a "missing" package once read as missing
+# while installed. Use `> /dev/null` on a grep that reads the whole stream.
+worst=999
+worst_name=""
+for d in $DOMAINS; do
+  f=$(find "$CERT_ROOT" -name "$d.crt" 2>/dev/null | head -1)
+  if [ -z "$f" ]; then
+    log err "CRITICAL: no certificate on disk for $d."
+    status=$((status + 1))
+    continue
+  fi
+  end=$(openssl x509 -in "$f" -noout -enddate 2>/dev/null | cut -d= -f2)
+  if [ -z "$end" ]; then
+    log err "CRITICAL: cannot read expiry for $d from $f."
+    status=$((status + 1))
+    continue
+  fi
+  secs=$(( $(date -d "$end" +%s) - $(date +%s) ))
+  days=$(( secs / 86400 ))
+  if [ "$days" -lt "$worst" ]; then worst=$days; worst_name=$d; fi
+
+  if [ "$days" -lt "$CRIT_DAYS" ]; then
+    log err "CRITICAL: $d expires in ${days}d ($end). Caddy should already have renewed it — renewal is failing."
+    status=$((status + 1))
+  elif [ "$days" -lt "$WARN_DAYS" ]; then
+    log warning "WARNING: $d expires in ${days}d ($end). Inside the renewal window; renewal has not happened yet."
+  else
+    log info "$d: ${days}d remaining ($end)"
+  fi
+done
+
+# ── 3. Nudge, once, in the critical window ──────────────────────────────────
+# Re-issuing is Caddy's job and it will not retry on a schedule, so all that is
+# left is to give it another chance. A restart is safe here precisely because we
+# are already in a state where expiry is the outcome: sslh keeps :443 answering
+# through the gap, and this cert is for the TURN hostname.
+if [ "$worst" -lt "$CRIT_DAYS" ] && [ "$NO_RESTART" != "1" ]; then
+  log warning "Restarting caddy once to give renewal another attempt (worst: $worst_name, ${worst}d)."
+  systemctl restart caddy
+  sleep 5
+  f=$(find "$CERT_ROOT" -name "$worst_name.crt" 2>/dev/null | head -1)
+  new=$(openssl x509 -in "$f" -noout -enddate 2>/dev/null | cut -d= -f2)
+  log warning "After restart, $worst_name expires $new."
+fi
+
+plural="problems"
+[ "$status" -eq 1 ] && plural="problem"
+log info "Summary: $status $plural; least days remaining $worst ($worst_name)."
+# Non-zero exit is what makes the unit report failed, so a problem shows up in
+# `systemctl list-timers` instead of passing silently every day.
+exit "$status"

@@ -1,0 +1,48 @@
+[Unit]
+Description=p2p file sharing — signal server (rooms, WebSocket signalling, TURN creds)
+Documentation=https://github.com/your/repo/docs/DEPLOY.md
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=signal
+Group=signal
+EnvironmentFile=/etc/signal/signal.env
+ExecStart=/opt/signal/signal
+Restart=always
+RestartSec=2
+
+# The process only needs to bind a socket and write nothing but stdout, so it
+# gets a tight sandbox. No new privileges, no exec, no writable /tmp, and the
+# only writable path is its own state dir.
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectKernelLogs=true
+ProtectControlGroups=true
+ProtectClock=true
+ProtectHostname=true
+ProtectProc=invisible
+RestrictNamespaces=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+LockPersonality=true
+MemoryDenyWriteExecute=true
+SystemCallFilter=@system-service
+SystemCallErrorNumber=EPERM
+ReadWritePaths=/opt/signal
+
+# Log both streams to journald; the service itself writes no files (no request
+# logging is a deliberate privacy choice — see docs/SECURITY.md).
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=signal
+
+[Install]
+WantedBy=multi-user.target

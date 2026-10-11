@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>System architecture — p2p file sharing</title>
+<meta name="robots" content="index,follow">
+<style>
+  html, body { margin: 0; height: 100%; background: #101014; }
+  iframe { border: 0; width: 100%; height: 100%; display: block; }
+  #fs {
+    position: fixed; right: 16px; bottom: 16px; z-index: 10;
+    display: flex; align-items: center; gap: 8px;
+    background: #1a1a1f; color: #f4f1e8; border: 1px solid rgba(244,241,232,.2);
+    border-radius: 11px; padding: 8px 12px; font-size: 15px; cursor: pointer;
+  }
+  #fs:hover { border-color: #ff5a1f; }
+  #fs svg { width: 17px; height: 17px; }
+</style>
+</head>
+<body>
+<iframe id="v" title="Interactive system architecture diagram" src="./architecture-viewer"></iframe>
+<button id="fs" hidden type="button"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 6V2h4M10 2h4v4M14 10v4h-4M6 14H2v-4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg> Full screen</button>
+<script>
+  // Fullscreen needs a user gesture, so it cannot start from ?present=1 alone.
+  // Forward any query (?present=1, theme) into the viewer, then offer one click.
+  const f = document.getElementById("v"), b = document.getElementById("fs");
+  if (location.search) f.src += location.search;
+  if (document.fullscreenEnabled) {
+    b.hidden = false;
+    b.onclick = () => document.documentElement.requestFullscreen().catch(() => {});
+  }
+</script>
+</body>
+</html>

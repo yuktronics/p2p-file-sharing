@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="google-site-verification" content="g7G7lBm6DdK0mUc0cGqCSeSqPNqg5x-NeZyLFA4lq_o" />
+<title>Blog — guides to sending large files peer-to-peer | p2p file sharing</title>
+<meta name="description" content="Practical guides to sending large files online: no size limits, no uploads, no accounts. P2P vs WeTransfer and cloud drives, safety, and creator workflows.">
+<link rel="canonical" href="{{SITE_URL}}/blog">
+<meta name="robots" content="index,follow,max-image-preview:large">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="p2p file sharing">
+<meta property="og:locale" content="en">
+<meta property="og:url" content="{{SITE_URL}}/blog">
+<meta property="og:title" content="Blog — guides to sending large files peer-to-peer">
+<meta property="og:description" content="No size limits, no uploads, no accounts. Comparisons, safety explainers, and workflows for large files.">
+<meta property="og:image" content="{{SITE_URL}}/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="p2p file sharing blog — guides to sending large files">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Blog — guides to sending large files peer-to-peer">
+<meta name="twitter:description" content="Comparisons, safety explainers, and workflows for sending large files with no uploads.">
+<meta name="twitter:image" content="{{SITE_URL}}/og.png">
+<meta name="theme-color" content="#1a1a1f">
+<script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"WebSite","@id":"{{SITE_URL}}/#website","url":"{{SITE_URL}}/","name":"p2p file sharing","inLanguage":"en"},{"@type":"Blog","@id":"{{SITE_URL}}/blog#blog","url":"{{SITE_URL}}/blog","name":"p2p file sharing blog","description":"Practical guides to sending large files peer-to-peer: no size limits, no uploads, no accounts.","inLanguage":"en","publisher":{"@type":"Organization","name":"p2p file sharing","url":"{{SITE_URL}}/"},"blogPost":[{"@type":"BlogPosting","headline":"How to send large files online with no size limit","url":"{{SITE_URL}}/blog/send-large-files-no-size-limit"},{"@type":"BlogPosting","headline":"A private WeTransfer alternative: P2P vs cloud file sharing","url":"{{SITE_URL}}/blog/wetransfer-alternative"},{"@type":"BlogPosting","headline":"Send files without an account: no-signup sharing that stays private","url":"{{SITE_URL}}/blog/send-files-without-account"},{"@type":"BlogPosting","headline":"Is P2P file sharing safe? How the encryption actually works","url":"{{SITE_URL}}/blog/is-p2p-file-sharing-safe"},{"@type":"BlogPosting","headline":"Send large videos and RAW photos: a creator's guide","url":"{{SITE_URL}}/blog/send-large-videos-photos"}]}]}</script>
+<link rel="stylesheet" href="/styles.css">
+<link rel="preload" as="style" href="/states.css" onload="this.onload=null;this.rel='stylesheet'">
+<noscript><link rel="stylesheet" href="/states.css"></noscript>
+<script src="/app.js" defer></script>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='15' fill='%231a1a1f'/%3E%3Crect x='8' y='23' width='10' height='3.6' rx='1.8' fill='%23ff5a1f'/%3E%3Crect x='5' y='30.2' width='13' height='3.6' rx='1.8' fill='%23ff5a1f' opacity='.65'/%3E%3Crect x='8' y='37.4' width='10' height='3.6' rx='1.8' fill='%23ff5a1f' opacity='.35'/%3E%3Cpath d='M26 14 h11 l7 7 v29 h-18 Z' fill='%23f4f1e8'/%3E%3Cpath d='M37 14 v7 h7' fill='%23ff5a1f'/%3E%3C/svg%3E">
+</head>
+<body>
+<div class="bg" aria-hidden="true"><div class="orb o1"></div><div class="orb o2"></div><div class="grid"></div><div class="noise"></div></div>
+<nav class="top"><div class="wrap nav-inner">
+  <a class="brand" href="/" aria-label="p2p file sharing home" translate="no"><span class="logo" aria-hidden="true"><svg viewBox="0 0 64 64"><rect width="64" height="64" rx="15" fill="#1a1a1f"/><rect x="8" y="23" width="10" height="3.6" rx="1.8" fill="#ff5a1f"/><rect x="5" y="30.2" width="13" height="3.6" rx="1.8" fill="#ff5a1f" opacity=".65"/><rect x="8" y="37.4" width="10" height="3.6" rx="1.8" fill="#ff5a1f" opacity=".35"/><path d="M26 14 h11 l7 7 v29 h-18 Z" fill="#f4f1e8"/><path d="M37 14 v7 h7" fill="#ff5a1f"/></svg></span> <span class="word">p2p <em>file sharing</em></span></a>
+  <div class="nav-links"><a href="/">Send</a><a href="/#receiveEntry">Receive</a><a href="/blog" aria-current="page">Blog</a><a href="/contact">Contact</a>
+    <a class="icon-btn" href="https://github.com/yuktronics/p2p-file-sharing" target="_blank" rel="noopener" aria-label="Source code on GitHub" data-tip="Source code"><svg class="gh" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"/></svg></a></div>
+    <button class="icon-btn" id="themeBtn" aria-label="Toggle theme" data-tip="Theme">◐</button>
+</div></nav>
+
+<div class="wrap">
+  <p class="crumbs"><a href="/">Home</a> · Blog</p>
+  <section class="hero" style="padding-bottom:0">
+    <span class="eyebrow"><span class="dot"></span> guides · comparisons · explainers</span>
+    <h1>Send files like you <span class="grad">mean it</span></h1>
+    <p class="sub">Practical guides to moving big files across the internet — <b>no uploads, no size limits, no accounts</b>. Written by the people who built the <a href="/">peer-to-peer sender</a>, tested in real browsers.</p>
+  </section>
+
+  <main class="blog-grid" aria-label="Blog posts">
+    <a class="card post-card" href="/blog/send-large-files-no-size-limit">
+      <span class="thumb" aria-hidden="true"><svg viewBox="0 0 400 200"><rect width="400" height="200" rx="14" fill="#1a1a1f"/><rect x="30" y="60" width="120" height="80" rx="12" fill="#242429" stroke="#ff5a1f" stroke-width="2"/><text x="90" y="108" font-size="34" text-anchor="middle">📦</text><rect x="250" y="60" width="120" height="80" rx="12" fill="#242429" stroke="#3ddc97" stroke-width="2"/><text x="310" y="108" font-size="34" text-anchor="middle">📥</text><line x1="150" y1="100" x2="250" y2="100" stroke="#ff5a1f" stroke-width="4" stroke-linecap="round"/><circle cx="200" cy="100" r="10" fill="#ff5a1f"/><text x="200" y="170" font-size="15" fill="#a8a49a" text-anchor="middle" font-family="monospace">20 GB · device → device</text></svg></span>
+      <span class="pc-body"><span class="k">Large files · 8 min read</span><h3>How to send large files online with no size limit</h3><p>Why email caps at 25 MB, why drives make you wait twice, and the P2P flow that streams a 20 GB project straight from your device.</p><span class="go">Read the guide →</span></span>
+    </a>
+    <a class="card post-card" href="/blog/wetransfer-alternative">
+      <span class="thumb" aria-hidden="true"><svg viewBox="0 0 400 200"><rect width="400" height="200" rx="14" fill="#1a1a1f"/><rect x="40" y="55" width="140" height="90" rx="12" fill="#242429" stroke="#6f6c64" stroke-width="2"/><text x="110" y="95" font-size="15" fill="#a8a49a" text-anchor="middle" font-family="monospace">cloud</text><text x="110" y="122" font-size="26" text-anchor="middle">☁️⬆️⬇️</text><rect x="220" y="55" width="140" height="90" rx="12" fill="#242429" stroke="#ff5a1f" stroke-width="2"/><text x="290" y="95" font-size="15" fill="#f4f1e8" text-anchor="middle" font-family="monospace">p2p</text><text x="290" y="122" font-size="26" text-anchor="middle">⚡🔒</text><text x="200" y="175" font-size="15" fill="#a8a49a" text-anchor="middle" font-family="monospace">upload-free vs upload-twice</text></svg></span>
+      <span class="pc-body"><span class="k">Comparison · 10 min read</span><h3>A private WeTransfer alternative: P2P vs cloud sharing</h3><p>WeTransfer, Drive, Dropbox and P2P side by side — limits, expiry, privacy — and when each one is honestly the right call.</p><span class="go">Compare them →</span></span>
+    </a>
+    <a class="card post-card" href="/blog/send-files-without-account">
+      <span class="thumb" aria-hidden="true"><svg viewBox="0 0 400 200"><rect width="400" height="200" rx="14" fill="#1a1a1f"/><rect x="130" y="45" width="140" height="90" rx="12" fill="#242429" stroke="#ff5a1f" stroke-width="2"/><text x="200" y="85" font-size="15" fill="#f4f1e8" text-anchor="middle" font-family="monospace">no signup</text><text x="200" y="115" font-size="26" text-anchor="middle">🔗📷🔢</text><text x="200" y="170" font-size="15" fill="#a8a49a" text-anchor="middle" font-family="monospace">link · QR · 4-digit code</text></svg></span>
+      <span class="pc-body"><span class="k">No signup · 6 min read</span><h3>Send files without an account</h3><p>No names, no emails, no trial clocks. Pick files, share a link or QR, close the tab and nothing remains — here's the whole flow.</p><span class="go">See how →</span></span>
+    </a>
+    <a class="card post-card" href="/blog/is-p2p-file-sharing-safe">
+      <span class="thumb" aria-hidden="true"><svg viewBox="0 0 400 200"><rect width="400" height="200" rx="14" fill="#1a1a1f"/><rect x="150" y="50" width="100" height="100" rx="50" fill="none" stroke="#3ddc97" stroke-width="3"/><text x="200" y="115" font-size="42" text-anchor="middle">🔒</text><text x="200" y="172" font-size="15" fill="#a8a49a" text-anchor="middle" font-family="monospace">DTLS · end to end</text></svg></span>
+      <span class="pc-body"><span class="k">Security · 9 min read</span><h3>Is P2P file sharing safe?</h3><p>What DTLS encryption actually covers, what the server can and can't see, and the five checks to run before you trust any transfer tool.</p><span class="go">Get the answers →</span></span>
+    </a>
+    <a class="card post-card" href="/blog/send-large-videos-photos">
+      <span class="thumb" aria-hidden="true"><svg viewBox="0 0 400 200"><rect width="400" height="200" rx="14" fill="#1a1a1f"/><text x="140" y="120" font-size="52" text-anchor="middle">🎬</text><text x="200" y="120" font-size="52" text-anchor="middle">📷</text><text x="260" y="120" font-size="52" text-anchor="middle">📦</text><text x="200" y="170" font-size="15" fill="#a8a49a" text-anchor="middle" font-family="monospace">4K · RAW · verified ✓</text></svg></span>
+      <span class="pc-body"><span class="k">Creators · 7 min read</span><h3>Send large videos and RAW photos</h3><p>4K footage, RAW bursts and project folders without recompressing or re-uploading — plus the checksum that proves every byte arrived.</p><span class="go">Learn the workflow →</span></span>
+    </a>
+    <div class="card pad cta-band" style="margin:0">
+      <h3>Try it right now — no signup</h3>
+      <p>Pick a file on the home page and your private link appears instantly.</p>
+      <p style="margin:0"><a class="btn btn-lg" href="/" style="text-decoration:none;display:inline-block">Send a file →</a></p>
+    </div>
+  </main>
+
+  <footer><div class="wrap" style="padding:0">
+    <span class="fbrand"><span class="logo"><svg viewBox="0 0 64 64"><rect width="64" height="64" rx="15" fill="#1a1a1f"/><rect x="8" y="23" width="10" height="3.6" rx="1.8" fill="#ff5a1f"/><rect x="5" y="30.2" width="13" height="3.6" rx="1.8" fill="#ff5a1f" opacity=".65"/><rect x="8" y="37.4" width="10" height="3.6" rx="1.8" fill="#ff5a1f" opacity=".35"/><path d="M26 14 h11 l7 7 v29 h-18 Z" fill="#f4f1e8"/><path d="M37 14 v7 h7" fill="#ff5a1f"/></svg></span> p2p file sharing · <a href="/privacy">Privacy</a> · <a href="/report">Report abuse</a></span>
+    <span class="hint">Made with love by Yuktronics.</span>
+  </div></footer>
+</div>
+</body>
+</html>

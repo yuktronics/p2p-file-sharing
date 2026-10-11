@@ -1,0 +1,65 @@
+# Template unit — one file, every VPS-hosted app.
+#
+#   systemctl enable --now signal@files      →  /etc/apps/files/signal.env
+#   systemctl enable --now signal@docs       →  /etc/apps/docs/signal.env
+#
+# Adding a backend is then: write an env file, reload, enable. No new unit, no
+# edits to a shared file, and no way for one app's restart to disturb another's.
+#
+# Identical security posture to signal.service — see that file for the reasoning
+# behind each directive.
+
+[Unit]
+Description=p2p file sharing — signal server (%i)
+Documentation=https://github.com/your/repo/docs/DNS-ROUTING.md
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=signal
+Group=signal
+# %i is the instance name, e.g. "files". Each app gets its own env file and so
+# its own port, rate limits, origins and TURN settings.
+EnvironmentFile=/etc/apps/%i/signal.env
+ExecStart=/opt/signal/signal
+Restart=always
+RestartSec=2
+
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectKernelLogs=true
+ProtectControlGroups=true
+ProtectClock=true
+ProtectHostname=true
+ProtectProc=invisible
+RestrictNamespaces=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+LockPersonality=true
+MemoryDenyWriteExecute=true
+SystemCallFilter=@system-service
+SystemCallErrorNumber=EPERM
+# Each instance serves its own static assets from here.
+ReadWritePaths=/opt/signal /opt/apps/%i /var/lib/signal
+
+# /var/lib/signal holds REPORT_LOG and USAGE_FILE. ProtectSystem=strict makes
+# the whole filesystem read-only except the paths listed here, so omitting it
+# does not fail loudly at startup — the flush just logs "read-only file system"
+# every minute and the counter silently never persists. It must stay in step
+# with the REPORT_LOG / USAGE_FILE paths in the env file.
+
+# No request logging, by deliberate privacy choice: a request log records every
+# room id, and a room id IS the share link (see docs/SECURITY.md).
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=signal-%i
+
+[Install]
+WantedBy=multi-user.target
