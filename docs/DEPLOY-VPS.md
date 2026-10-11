@@ -637,6 +637,20 @@ sudo systemctl restart signal@<app>
 curl -sS http://127.0.0.1:8090/healthz     # → ok
 ```
 
+> If any file under `signal/web/` changed (new page, new asset, new route),
+> sync it too **before** restarting — the server preloads every mapped file at
+> startup and fail-closes (exit 1, crash loop) when one is missing, even on an
+> API-only host that never serves them:
+>
+> ```bash
+> # on the workstation, from the repo root (tracked web files only)
+> cd signal/web && for f in $(git ls-files | grep -v '^dist/'); do
+>   scp "$f" ubuntu@<VM-IP>:/tmp/web-sync/
+> done
+> # on the box — mirror the tree, then restart as above
+> sudo cp -r /tmp/web-sync/. /opt/apps/files/web/ && rm -rf /tmp/web-sync
+> ```
+
 Verify what is live — version first, behavior second:
 
 ```bash

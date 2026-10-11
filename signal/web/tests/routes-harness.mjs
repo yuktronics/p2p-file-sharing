@@ -185,13 +185,23 @@ const globalBlock = blockFor("/*");
 ok(!!globalBlock, "_headers has a /* block (global security headers)");
 for (const h of [
   "X-Content-Type-Options: nosniff",
-  "X-Frame-Options: DENY",
   "Referrer-Policy: no-referrer",
-  "Content-Security-Policy",
 ]) {
   const key = h.split(":")[0].toLowerCase();
   ok(new RegExp(key.replace(/[-]/g, "\\-") + ":", "i").test(globalBlock || ""),
     `/* block sets ${h} (got ${JSON.stringify(globalBlock)})`);
+}
+// Framing lives ONLY in per-path blocks: Cloudflare merges every matching
+// block, so X-Frame-Options / CSP in /* would duplicate the per-path ones and
+// browsers would enforce the stricter copy. Every listed path therefore
+// carries its own framing headers — DENY except the two architecture paths.
+// blockFor addresses single-path blocks; the PAGES-shared block (/, /receive,
+// /report.html, …) is covered by the totals below instead.
+for (const p of ["/blog", "/blog/*", "/r/*", "/report/*",
+  "/qrcode.js", "/sw.js", "/signal-config.json"]) {
+  const block = blockFor(p);
+  ok(!!block && /X-Frame-Options:\s*DENY/i.test(block), `${p} denies framing`);
+  ok(!!block && /frame-ancestors 'none'/.test(block), `${p} CSP denies framing`);
 }
 
 // The pages must be INLINED, not left linking the stylesheets: a silently
@@ -303,8 +313,17 @@ for (const page of ["index.html", "receive.html", "report.html", "privacy.html",
     ok(!!block && /X-Frame-Options:\s*SAMEORIGIN/i.test(block), `${p} allows same-origin framing`);
     ok(!!block && /frame-ancestors 'self'/.test(block), `${p} CSP narrows frame-ancestors to 'self'`);
   }
-  const globalBlock = blockFor("/*");
-  ok(/X-Frame-Options:\s*DENY/i.test(globalBlock || ""), "global policy still denies framing");
+  // The /* block must NOT set framing headers itself: with merge semantics
+  // they would duplicate every per-path one and re-deny the exception.
+  ok(!/X-Frame-Options:/i.test(globalBlock || "") && !/Content-Security-Policy:/i.test(globalBlock || ""),
+    "global block carries no framing headers (per-path only)");
+  // Totals pin the whole file: 10 DENY blocks (PAGES-shared + 9 singles),
+  // 2 SAMEORIGIN (architecture pair), nothing else.
+  const headersText = readFileSync(join(DIST, "_headers"), "utf8");
+  ok((headersText.match(/X-Frame-Options:\s*DENY/gi) || []).length === 10, "10 DENY blocks");
+  ok((headersText.match(/X-Frame-Options:\s*SAMEORIGIN/gi) || []).length === 2, "2 SAMEORIGIN blocks");
+  ok((headersText.match(/frame-ancestors 'none'/g) || []).length === 10, "10 deny-ancestors CSPs");
+  ok((headersText.match(/frame-ancestors 'self'/g) || []).length === 2, "2 self-ancestors CSPs");
 }
 
 // ---- 9. the client must be able to find the room id in the path ----------
@@ -408,6 +427,36 @@ const DEV_PORT = 5199;
   // The only translate="no" the bundle can carry comes from the row templates.
   ok(appJs.includes('translate="no"'),
     "shipped bundle excludes file names from translation");
+}
+
+// ---- 12. nav bars stay structurally uniform --------------------------------
+// The receive-page regression was a control OUTSIDE .nav-links (flex
+// space-between flung it to the bar's far edge). Pages legitimately differ in
+// links, so this pins structure, not content: every nav control lives inside
+// .nav-links, every nav links /contact, and nav divs balance.
+{
+  const navPages = ["index.html", "receive.html", "privacy.html", "blog.html", "contact.html",
+    "blog/is-p2p-file-sharing-safe.html", "blog/send-files-without-account.html",
+    "blog/send-large-files-no-size-limit.html", "blog/send-large-videos-photos.html",
+    "blog/wetransfer-alternative.html"];
+  for (const page of navPages) {
+    const html = readFileSync(join(DIST, page), "utf8");
+    const nav = html.match(/<nav class="top">[\s\S]*?<\/nav>/);
+    ok(!!nav, `${page} has a top nav`);
+    if (!nav) continue;
+    const inner = nav[0].replace(/<svg[\s\S]*?<\/svg>/g, "");
+    for (const id of ["themeBtn", "soundBtn"]) {
+      if (!inner.includes(`id="${id}"`)) continue;
+      const openPos = inner.indexOf('<div class="nav-links">');
+      const btnPos = inner.indexOf(`id="${id}"`);
+      const closePos = inner.indexOf("</div>", openPos);
+      ok(openPos < btnPos && btnPos < closePos, `${page} #${id} sits inside .nav-links`);
+    }
+    ok(inner.includes('href="/contact"'), `${page} nav links /contact`);
+    const opens = (inner.match(/<div\b/g) || []).length;
+    const closes = (inner.match(/<\/div>/g) || []).length;
+    ok(opens === closes, `${page} nav divs balance (${opens} opens)`);
+  }
 }
 
 console.log(`\n${pass}/${pass + fail} green`);

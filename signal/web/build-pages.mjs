@@ -117,14 +117,26 @@ if (wranglerCfg.assets?.directory !== "./signal/web/dist") {
 // drift from it: only frame-ancestors/X-Frame-Options may differ between them.
 const CSP_BASE = "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src *; frame-ancestors 'none'; base-uri 'none'; form-action 'none'; object-src 'none'";
 const CSP_FRAMABLE = CSP_BASE.replace("frame-ancestors 'none'", "frame-ancestors 'self'");
+// Cloudflare MERGES every matching _headers block (it does not override), so a
+// framing header in /* would duplicate the per-path one below — and browsers
+// enforce the stricter of two X-Frame-Options and the intersection of two
+// CSPs, silently re-denying the exception. Framing therefore lives ONLY in
+// per-path blocks: DENY everywhere, SAMEORIGIN on the two architecture paths
+// the wrapper embeds same-origin.
+const frameDeny = `  X-Frame-Options: DENY
+  Content-Security-Policy: ${CSP_BASE}`;
+const frameSame = `  X-Frame-Options: SAMEORIGIN
+  Content-Security-Policy: ${CSP_FRAMABLE}`;
+// Unlisted static files (icons, robots.txt, sitemap.xml) inherit the frameless
+// /* remainder: none of them is an interactive document, so there is nothing
+// to clickjack. If a future interactive page ships without its own block, the
+// totals check below fails closed.
 const securityHeaders = () => `\
 /*
   X-Content-Type-Options: nosniff
-  X-Frame-Options: DENY
   Referrer-Policy: no-referrer
   Permissions-Policy: geolocation=(), microphone=(), camera=(), interest-cohort=()
   Strict-Transport-Security: max-age=31536000; includeSubDomains
-  Content-Security-Policy: ${CSP_BASE}
 
 # Cloudflare Pages cache policy (replaces the Go static cache for this deployment)
 `;
@@ -213,26 +225,27 @@ for (const p of PAGES) {
 writeFileSync(join(STAGE, "_headers"), `${securityHeaders()}
 /${PAGES.join("\n/")}
 /  Cache-Control: public, max-age=0, must-revalidate
+${frameDeny}
 # Blog: HTML like the pages above, but requested at extensionless URLs (/blog,
 # /blog/<slug>) that never equal these file paths — so they get their own
 # blocks. Same policy: revalidate every time, 304 when unchanged.
 # (The Go server sends no-cache for HTML; the effect is identical.)
 /blog
   Cache-Control: public, max-age=0, must-revalidate
+${frameDeny}
 /blog/*
   Cache-Control: public, max-age=0, must-revalidate
+${frameDeny}
 # Interactive architecture viewer: a stable public page like the ones above,
 # requested at the extensionless /architecture that auto-trailing-slash
 # resolves to architecture.html. Same policy: revalidate every time.
 # (The Go server sends no-cache for HTML; the effect is identical.)
 /architecture
   Cache-Control: public, max-age=0, must-revalidate
-  X-Frame-Options: SAMEORIGIN
-  Content-Security-Policy: ${CSP_FRAMABLE}
+${frameSame}
 /architecture-viewer
   Cache-Control: public, max-age=0, must-revalidate
-  X-Frame-Options: SAMEORIGIN
-  Content-Security-Policy: ${CSP_FRAMABLE}
+${frameSame}
 # Room and report paths are share-link SECRETS — a room id is the bearer token
 # for a live transfer — and must never enter a search index. The Go server sends
 # this header in single-origin mode (internal/server/seo.go); without it here the
@@ -245,17 +258,23 @@ writeFileSync(join(STAGE, "_headers"), `${securityHeaders()}
 /r/*
   X-Robots-Tag: noindex, nofollow
   Cache-Control: public, max-age=0, must-revalidate
+${frameDeny}
 /report/*
   X-Robots-Tag: noindex, nofollow
   Cache-Control: public, max-age=0, must-revalidate
+${frameDeny}
 /report.html
   X-Robots-Tag: noindex, nofollow
+${frameDeny}
 /${appName}
   Cache-Control: public, max-age=31536000, immutable
+${frameDeny}
 /qrcode.js
   Cache-Control: public, max-age=3600, must-revalidate
+${frameDeny}
 /sw.js
   Cache-Control: public, max-age=0, must-revalidate
+${frameDeny}
 
 # The remotely-updatable backend address. Cross-origin on purpose: the config
 # host and the backend host are independent, so a page served anywhere must be
@@ -269,6 +288,7 @@ writeFileSync(join(STAGE, "_headers"), `${securityHeaders()}
   Access-Control-Allow-Methods: GET, OPTIONS
   Cache-Control: no-store, no-cache, must-revalidate
   Vary: Origin
+${frameDeny}
 `);
 
 // Pages serves static files only, so the paths the Go server serves via explicit
